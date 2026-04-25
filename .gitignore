@@ -364,3 +364,17 @@ FodyWeavers.xsd
 
 # App settings with sensitive data
 appsettings.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+
+# JetBrains Rider
+.idea/
+*.sln.iml
