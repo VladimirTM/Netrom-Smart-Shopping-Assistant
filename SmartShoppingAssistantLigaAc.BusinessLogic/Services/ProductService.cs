@@ -7,17 +7,66 @@ namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
 public class ProductService(IRepository<Product> productRepository) : IProductService
 {
+    public async Task<List<ProductGetDTO>> GetAllAsync(string? name, decimal? minPrice, decimal? maxPrice)
+    {
+        var products = await productRepository.GetAllAsync();
+
+        if (name is not null)
+            products = products.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (minPrice is not null)
+            products = products.Where(p => p.Price >= minPrice).ToList();
+
+        if (maxPrice is not null)
+            products = products.Where(p => p.Price <= maxPrice).ToList();
+
+        return products.Select(MapToDTO).ToList();
+    }
+
     public async Task<ProductGetDTO> GetByIdAsync(int id)
     {
         var product = await productRepository.GetByIdAsync(id);
-
-        return new ProductGetDTO
-        {
-            Id = product.Id,
-            Name = product.Name,
-            Description = product.Description,
-            ImageUrl = product.ImageUrl,
-            Price = product.Price
-        };
+        return MapToDTO(product);
     }
+
+    public async Task<ProductGetDTO> CreateAsync(ProductCreateDTO dto)
+    {
+        var product = new Product
+        {
+            Name = dto.Name,
+            Description = dto.Description,
+            Price = dto.Price,
+            ImageUrl = dto.ImageUrl
+        };
+
+        var created = await productRepository.AddAsync(product);
+        return MapToDTO(created);
+    }
+
+    public async Task<ProductGetDTO> UpdateAsync(int id, ProductUpdateDTO dto)
+    {
+        var product = await productRepository.GetByIdAsync(id);
+
+        product.Name = dto.Name;
+        product.Description = dto.Description;
+        product.Price = dto.Price;
+        product.ImageUrl = dto.ImageUrl;
+
+        var updated = await productRepository.UpdateAsync(product);
+        return MapToDTO(updated);
+    }
+
+    public async Task DeleteAsync(int id)
+    {
+        await productRepository.DeleteAsync(id);
+    }
+
+    private static ProductGetDTO MapToDTO(Product product) => new()
+    {
+        Id = product.Id,
+        Name = product.Name,
+        Description = product.Description,
+        ImageUrl = product.ImageUrl,
+        Price = product.Price
+    };
 }
