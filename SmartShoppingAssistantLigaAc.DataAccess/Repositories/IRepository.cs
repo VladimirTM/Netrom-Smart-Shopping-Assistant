@@ -7,4 +7,5 @@ public interface IRepository<TEntity> where TEntity : class
     Task<TEntity> AddAsync(TEntity entity);
     Task<TEntity> UpdateAsync(TEntity entity);
     Task DeleteAsync(int id);
+    Task DeleteAllAsync();
 }

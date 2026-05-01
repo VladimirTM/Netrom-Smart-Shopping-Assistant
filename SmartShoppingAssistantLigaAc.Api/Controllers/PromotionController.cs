@@ -4,7 +4,7 @@ using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 
 namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/promotions")]
 [ApiController]
 public class PromotionController(IPromotionService promotionService) : ControllerBase
 {

@@ -4,7 +4,7 @@ using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 
 namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 
-[Route("api/[controller]")]
+[Route("api/products")]
 [ApiController]
 public class ProductController(IProductService productService) : ControllerBase
 {

@@ -28,6 +28,9 @@ builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IRepository<Promotion>, BaseRepository<Promotion>>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
 
+builder.Services.AddScoped<IRepository<CartItem>, BaseRepository<CartItem>>();
+builder.Services.AddScoped<ICartItemService, CartItemService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -82,4 +82,18 @@ public class BaseRepository<TEntity>(SmartShoppingAssistantDbContext context) : 
             throw new Exception($"Error while deleting entity with id {id}: {ex.Message}", ex);
         }
     }
+
+    public async Task DeleteAllAsync()
+    {
+        try
+        {
+            var entities = await context.Set<TEntity>().ToListAsync();
+            context.Set<TEntity>().RemoveRange(entities);
+            await context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Error while deleting entities: {ex.Message}", ex);
+        }
+    }
 }
