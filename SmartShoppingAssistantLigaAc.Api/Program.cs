@@ -25,6 +25,9 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IRepository<Category>, BaseRepository<Category>>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 
+builder.Services.AddScoped<IRepository<Promotion>, BaseRepository<Promotion>>();
+builder.Services.AddScoped<IPromotionService, PromotionService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -6,22 +6,22 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class ProductsController(IProductService productService) : ControllerBase
+public class PromotionController(IPromotionService promotionService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ProductGetDTO>>> GetAll()
+    public async Task<ActionResult<List<PromotionGetDTO>>> GetAll()
     {
-        var products = await productService.GetAllAsync();
-        return Ok(products);
+        var promotions = await promotionService.GetAllAsync();
+        return Ok(promotions);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<ProductGetDTO>> GetById(int id)
+    public async Task<ActionResult<PromotionGetDTO>> GetById(int id)
     {
         try
         {
-            var product = await productService.GetByIdAsync(id);
-            return Ok(product);
+            var promotion = await promotionService.GetByIdAsync(id);
+            return Ok(promotion);
         }
         catch (Exception ex)
         {
@@ -30,18 +30,18 @@ public class ProductsController(IProductService productService) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<ProductGetDTO>> Create([FromBody] ProductCreateDTO dto)
+    public async Task<ActionResult<PromotionGetDTO>> Create([FromBody] PromotionCreateDTO dto)
     {
-        var created = await productService.CreateAsync(dto);
+        var created = await promotionService.CreateAsync(dto);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<ProductGetDTO>> Update(int id, [FromBody] ProductUpdateDTO dto)
+    public async Task<ActionResult<PromotionGetDTO>> Update(int id, [FromBody] PromotionUpdateDTO dto)
     {
         try
         {
-            var updated = await productService.UpdateAsync(id, dto);
+            var updated = await promotionService.UpdateAsync(id, dto);
             return Ok(updated);
         }
         catch (Exception ex)
@@ -55,7 +55,7 @@ public class ProductsController(IProductService productService) : ControllerBase
     {
         try
         {
-            await productService.DeleteAsync(id);
+            await promotionService.DeleteAsync(id);
             return NoContent();
         }
         catch (Exception ex)
