@@ -9,10 +9,10 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 public class CartItemController(ICartItemService cartItemService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<CartItemGetDTO>>> GetAll()
+    public async Task<ActionResult<CartGetDTO>> GetAll()
     {
-        var cartItems = await cartItemService.GetAllAsync();
-        return Ok(cartItems);
+        var cart = await cartItemService.GetAllAsync();
+        return Ok(cart);
     }
     
     [HttpGet("items/{id}")]

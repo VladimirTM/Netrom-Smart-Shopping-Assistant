@@ -1,6 +1,5 @@
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
-using SmartShoppingAssistantLigaAc.DataAccess;
 using SmartShoppingAssistantLigaAc.DataAccess.Entities;
 using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 
@@ -8,8 +7,7 @@ namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
 public class ProductService(
     IProductRepository productRepository,
-    IRepository<Category> categoryRepository,
-    SmartShoppingAssistantDbContext context) : IProductService
+    IRepository<Category> categoryRepository) : IProductService
 {
     public async Task<List<ProductGetDTO>> GetAllAsync()
     {

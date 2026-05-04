@@ -11,8 +11,8 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     [HttpGet]
     public async Task<ActionResult<List<CategoryGetDTO>>> GetAll()
     {
-        var products = await categoryService.GetAllAsync();
-        return Ok(products);
+        var categories = await categoryService.GetAllAsync();
+        return Ok(categories);
     }
 
     [HttpGet("{id}")]
@@ -20,8 +20,8 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     {
         try
         {
-            var product = await categoryService.GetByIdAsync(id);
-            return Ok(product);
+            var category = await categoryService.GetByIdAsync(id);
+            return Ok(category);
         }
         catch (Exception ex)
         {
