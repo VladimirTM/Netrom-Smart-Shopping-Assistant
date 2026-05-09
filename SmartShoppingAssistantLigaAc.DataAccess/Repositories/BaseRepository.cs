@@ -5,6 +5,8 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 public class BaseRepository<TEntity>(SmartShoppingAssistantDbContext context) : IRepository<TEntity> where TEntity : class
 {
     protected readonly SmartShoppingAssistantDbContext Context = context;
+    
+    public IQueryable<TEntity> GetAllAsQueryable() => context.Set<TEntity>().AsQueryable();
 
     public async Task<TEntity> GetByIdAsync(int id)
     {

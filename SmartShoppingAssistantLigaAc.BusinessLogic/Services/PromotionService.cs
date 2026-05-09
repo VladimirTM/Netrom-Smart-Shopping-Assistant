@@ -5,7 +5,7 @@ using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
-public class PromotionService(IRepository<Promotion> promotionRepository) : IPromotionService
+public class PromotionService(IPromotionRepository promotionRepository) : IPromotionService
 {
     public async Task<List<PromotionGetDTO>> GetAllAsync(bool activeOnly = false)
     {
@@ -61,6 +61,12 @@ public class PromotionService(IRepository<Promotion> promotionRepository) : IPro
     public async Task DeleteAsync(int id)
     {
         await promotionRepository.DeleteAsync(id);
+    }
+    
+    public async Task<List<PromotionGetDTO>> GetForProductAsync(int productId)
+    {
+        var promotions = await promotionRepository.GetForProductAsync(productId);
+        return promotions.Select(MapToDTO).ToList();
     }
 
     private static PromotionGetDTO MapToDTO(Promotion promotion) => new()

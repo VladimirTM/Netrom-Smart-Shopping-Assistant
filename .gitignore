@@ -378,3 +378,4 @@ appsettings.json
 # JetBrains Rider
 .idea/
 *.sln.iml
+SmartShoppingAssistantLigaAc.Api/appsettings.Development.json
