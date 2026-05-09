@@ -15,16 +15,23 @@ public class CartItemService(
         var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync();
         var promotions = (await promotionRepository.GetAllAsync()).Where(p => p.IsActive).ToList();
 
-        var totalPrice = cartItems.Sum(i => i.Product.Price * i.Quantity);
-        var promotionsValue = promotions.Sum(p => CalculateDiscount(p, cartItems, totalPrice));
-        promotionsValue = Math.Min(promotionsValue, totalPrice);
+        var subtotal = cartItems.Sum(i => i.Product.Price * i.Quantity);
+
+        var appliedPromotions = promotions
+            .Select(p => (Promotion: p, Discount: CalculateDiscount(p, cartItems, subtotal)))
+            .Where(x => x.Discount > 0)
+            .Select(x => new AppliedPromotionDTO { PromotionName = x.Promotion.Name, Discount = -x.Discount })
+            .ToList();
+
+        var totalDiscount = Math.Max(appliedPromotions.Sum(x => x.Discount), -subtotal);
 
         return new CartGetDTO
         {
             Items = cartItems.Select(MapToDTO).ToList(),
-            TotalPrice = totalPrice,
-            PromotionsValue = promotionsValue,
-            TotalAfterPromotions = totalPrice - promotionsValue
+            Subtotal = subtotal,
+            AppliedPromotions = appliedPromotions,
+            TotalDiscount = totalDiscount,
+            Total = subtotal + totalDiscount
         };
     }
 
@@ -34,7 +41,7 @@ public class CartItemService(
         return MapToDTO(cartItem);
     }
 
-    public async Task<CartItemGetDTO> CreateAsync(CartItemCreateDTO dto)
+    public async Task<CartGetDTO> CreateAsync(CartItemCreateDTO dto)
     {
         var cartItem = new CartItem
         {
@@ -42,24 +49,24 @@ public class CartItemService(
             Quantity = dto.Quantity
         };
 
-        var created = await cartItemRepository.AddAsync(cartItem);
-        return MapToDTO(created);
+        await cartItemRepository.AddAsync(cartItem);
+        return await GetAllAsync();
     }
 
-    public async Task<CartItemGetDTO> UpdateAsync(int itemId, CartItemUpdateDTO dto)
+    public async Task<CartGetDTO> UpdateAsync(int id, CartItemUpdateDTO dto)
     {
-        var cartItem = await cartItemRepository.GetByIdAsync(itemId);
+        var cartItem = await cartItemRepository.GetByIdAsync(id);
 
-        cartItem.ProductId = dto.ProductId;
         cartItem.Quantity = dto.Quantity;
 
-        var updated = await cartItemRepository.UpdateAsync(cartItem);
-        return MapToDTO(updated);
+        await cartItemRepository.UpdateAsync(cartItem);
+        return await GetAllAsync();
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task<CartGetDTO> DeleteAsync(int id)
     {
         await cartItemRepository.DeleteAsync(id);
+        return await GetAllAsync();
     }
 
     public async Task DeleteAllAsync()
@@ -119,6 +126,9 @@ public class CartItemService(
     {
         Id = cartItem.Id,
         ProductId = cartItem.ProductId,
+        ProductName = cartItem.Product.Name,
+        Price = cartItem.Product.Price,
         Quantity = cartItem.Quantity,
+        Subtotal = cartItem.Product.Price * cartItem.Quantity
     };
 }

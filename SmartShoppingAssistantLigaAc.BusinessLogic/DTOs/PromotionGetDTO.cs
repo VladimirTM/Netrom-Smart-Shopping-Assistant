@@ -1,12 +1,14 @@
+using SmartShoppingAssistantLigaAc.DataAccess.Entities.Enums;
+
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
 
 public class PromotionGetDTO
 {
     public int Id { get; set; }
     public string Name { get; set; } = null!;
-    public PromotionTypeDTO Type { get; set; } = null!;
+    public PromotionType Type { get; set; }
     public decimal Threshold { get; set; }
-    public PromotionRewardDTO Reward { get; set; } = null!;
+    public PromotionReward Reward { get; set; }
     public int RewardValue { get; set; }
     public int? ProductId { get; set; }
     public int? CategoryId { get; set; }

@@ -9,9 +9,9 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 public class PromotionController(IPromotionService promotionService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<PromotionGetDTO>>> GetAll()
+    public async Task<ActionResult<List<PromotionGetDTO>>> GetAll([FromQuery] bool activeOnly = false)
     {
-        var promotions = await promotionService.GetAllAsync();
+        var promotions = await promotionService.GetAllAsync(activeOnly);
         return Ok(promotions);
     }
 

@@ -9,9 +9,13 @@ public class ProductService(
     IProductRepository productRepository,
     IRepository<Category> categoryRepository) : IProductService
 {
-    public async Task<List<ProductGetDTO>> GetAllAsync()
+    public async Task<List<ProductGetDTO>> GetAllAsync(int? categoryId = null)
     {
         var products = await productRepository.GetAllWithCategoriesAsync();
+
+        if (categoryId.HasValue)
+            products = products.Where(p => p.Categories.Any(c => c.Id == categoryId.Value)).ToList();
+
         return products.Select(MapToDTO).ToList();
     }
 
@@ -50,7 +54,7 @@ public class ProductService(
         product.Description = dto.Description;
         product.Price = dto.Price;
         product.ImageUrl = dto.ImageUrl;
-        
+
         product.Categories.Clear();
         foreach (var categoryId in dto.CategoryIds)
         {

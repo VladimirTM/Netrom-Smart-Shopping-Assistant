@@ -7,36 +7,22 @@ public class ProductRepository(SmartShoppingAssistantDbContext context) : BaseRe
 {
     public async Task<Product> GetByIdWithCategoriesAsync(int id)
     {
-        try
-        {
-            var product = await context.Set<Product>()
-                .Include(p => p.Categories)
-                .FirstOrDefaultAsync(p => p.Id == id);
+        var product = await Context.Set<Product>()
+            .Include(p => p.Categories)
+            .FirstOrDefaultAsync(p => p.Id == id);
 
-            if (product == null)
-            {
-                throw new Exception($"Product with id {id} not found");
-            }
-
-            return product;
-        }
-        catch (Exception ex)
+        if (product == null)
         {
-            throw new Exception($"Error retrieving product with id {id}: {ex.Message}", ex);
+            throw new KeyNotFoundException($"Product with id {id} not found");
         }
+
+        return product;
     }
 
     public async Task<List<Product>> GetAllWithCategoriesAsync()
     {
-        try
-        {
-            return await context.Set<Product>()
-                .Include(p => p.Categories)
-                .ToListAsync();
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error retrieving products: {ex.Message}", ex);
-        }
+        return await Context.Set<Product>()
+            .Include(p => p.Categories)
+            .ToListAsync();
     }
 }

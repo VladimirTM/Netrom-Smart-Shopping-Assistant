@@ -23,13 +23,13 @@ public class PromotionConfiguration : IEntityTypeConfiguration<Promotion>
         builder.Property(p => p.RewardValue).IsRequired();
 
         builder.HasOne(p => p.Product)
-            .WithMany(p => p.Promotions)
+            .WithMany(prod => prod.Promotions)
             .HasForeignKey(p => p.ProductId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(p => p.Category)
-            .WithMany(p => p.Promotions)
+            .WithMany(c => c.Promotions)
             .HasForeignKey(p => p.CategoryId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);

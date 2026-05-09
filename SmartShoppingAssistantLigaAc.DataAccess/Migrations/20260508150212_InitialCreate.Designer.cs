@@ -11,7 +11,7 @@ using SmartShoppingAssistantLigaAc.DataAccess;
 namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
 {
     [DbContext(typeof(SmartShoppingAssistantDbContext))]
-    [Migration("20260421115729_InitialCreate")]
+    [Migration("20260508150212_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -26,15 +26,15 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
 
             modelBuilder.Entity("ProductCategories", b =>
                 {
-                    b.Property<int>("CategoriesId")
+                    b.Property<int>("CategoryId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ProductsId")
+                    b.Property<int>("ProductId")
                         .HasColumnType("integer");
 
-                    b.HasKey("CategoriesId", "ProductsId");
+                    b.HasKey("CategoryId", "ProductId");
 
-                    b.HasIndex("ProductsId");
+                    b.HasIndex("ProductId");
 
                     b.ToTable("ProductCategories");
                 });
@@ -79,7 +79,7 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Category", (string)null);
+                    b.ToTable("Categories", (string)null);
                 });
 
             modelBuilder.Entity("SmartShoppingAssistantLigaAc.DataAccess.Entities.Product", b =>
@@ -91,12 +91,10 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
-                        .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
                     b.Property<string>("ImageUrl")
-                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
@@ -111,7 +109,7 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("SmartShoppingAssistantLigaAc.DataAccess.Entities.Promotion", b =>
@@ -162,13 +160,13 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
                 {
                     b.HasOne("SmartShoppingAssistantLigaAc.DataAccess.Entities.Category", null)
                         .WithMany()
-                        .HasForeignKey("CategoriesId")
+                        .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("SmartShoppingAssistantLigaAc.DataAccess.Entities.Product", null)
                         .WithMany()
-                        .HasForeignKey("ProductsId")
+                        .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -14,7 +14,7 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
         var cart = await cartItemService.GetAllAsync();
         return Ok(cart);
     }
-    
+
     [HttpGet("items/{id}")]
     public async Task<ActionResult<CartItemGetDTO>> GetById(int id)
     {
@@ -30,19 +30,19 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     }
 
     [HttpPost("items")]
-    public async Task<ActionResult<CartItemGetDTO>> Create([FromBody] CartItemCreateDTO dto)
+    public async Task<ActionResult<CartGetDTO>> Create([FromBody] CartItemCreateDTO dto)
     {
-        var created = await cartItemService.CreateAsync(dto);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        var cart = await cartItemService.CreateAsync(dto);
+        return Ok(cart);
     }
 
     [HttpPut("items/{id}")]
-    public async Task<ActionResult<CartItemGetDTO>> Update(int id, [FromBody] CartItemUpdateDTO dto)
+    public async Task<ActionResult<CartGetDTO>> Update(int id, [FromBody] CartItemUpdateDTO dto)
     {
         try
         {
-            var updated = await cartItemService.UpdateAsync(id, dto);
-            return Ok(updated);
+            var cart = await cartItemService.UpdateAsync(id, dto);
+            return Ok(cart);
         }
         catch (Exception ex)
         {
@@ -51,12 +51,12 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     }
 
     [HttpDelete("items/{id}")]
-    public async Task<IActionResult> DeleteById(int id)
+    public async Task<ActionResult<CartGetDTO>> Delete(int id)
     {
         try
         {
-            await cartItemService.DeleteAsync(id);
-            return NoContent();
+            var cart = await cartItemService.DeleteAsync(id);
+            return Ok(cart);
         }
         catch (Exception ex)
         {
@@ -67,14 +67,7 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     [HttpDelete]
     public async Task<IActionResult> DeleteAll()
     {
-        try
-        {
-            await cartItemService.DeleteAllAsync();
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            return NotFound(ex.Message);
-        }
+        await cartItemService.DeleteAllAsync();
+        return NoContent();
     }
 }

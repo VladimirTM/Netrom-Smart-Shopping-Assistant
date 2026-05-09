@@ -1,8 +1,0 @@
-namespace SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
-
-public class PromotionTypeDTO
-{
-    public int Value { get; set; }
-    public string Name { get; set; } = null!;
-    public string Description { get; set; } = null!;
-}

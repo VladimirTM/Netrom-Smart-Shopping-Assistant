@@ -4,12 +4,15 @@ using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 using SmartShoppingAssistantLigaAc.DataAccess;
 using SmartShoppingAssistantLigaAc.DataAccess.Entities;
 using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 

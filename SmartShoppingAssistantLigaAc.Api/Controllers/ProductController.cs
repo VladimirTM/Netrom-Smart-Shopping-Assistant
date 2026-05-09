@@ -9,9 +9,9 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 public class ProductController(IProductService productService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ProductGetDTO>>> GetAll()
+    public async Task<ActionResult<List<ProductGetDTO>>> GetAll([FromQuery] int? categoryId = null)
     {
-        var products = await productService.GetAllAsync();
+        var products = await productService.GetAllAsync(categoryId);
         return Ok(products);
     }
 
@@ -32,8 +32,15 @@ public class ProductController(IProductService productService) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ProductGetDTO>> Create([FromBody] ProductCreateDTO dto)
     {
-        var created = await productService.CreateAsync(dto);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        try
+        {
+            var created = await productService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (Exception ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpPut("{id}")]

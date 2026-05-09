@@ -4,96 +4,56 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 
 public class BaseRepository<TEntity>(SmartShoppingAssistantDbContext context) : IRepository<TEntity> where TEntity : class
 {
+    protected readonly SmartShoppingAssistantDbContext Context = context;
+
     public async Task<TEntity> GetByIdAsync(int id)
     {
-        try
-        {
-            var entity = await context.Set<TEntity>().FindAsync(id);
+        var entity = await Context.Set<TEntity>().FindAsync(id);
 
-            if (entity == null)
-            {
-                throw new Exception($"Entity with id {id} not found");
-            }
-            
-            return entity;
-        }
-        catch (Exception ex)
+        if (entity == null)
         {
-            throw new Exception($"Error retrieving entity with id {id}: {ex.Message}", ex);
+            throw new KeyNotFoundException($"Entity with id {id} not found");
         }
+
+        return entity;
     }
 
     public async Task<List<TEntity>> GetAllAsync()
     {
-        try
-        {
-            return await context.Set<TEntity>().ToListAsync();
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error retrieving entities: {ex.Message}", ex);
-        }
+        return await Context.Set<TEntity>().ToListAsync();
     }
 
     public async Task<TEntity> AddAsync(TEntity entity)
     {
-        try
-        {
-            var addedEntity = await context.Set<TEntity>().AddAsync(entity);
-            await context.SaveChangesAsync();
-            return addedEntity.Entity;
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error adding entity: {ex.Message}", ex);
-        }
+        var addedEntity = await Context.Set<TEntity>().AddAsync(entity);
+        await Context.SaveChangesAsync();
+        return addedEntity.Entity;
     }
 
     public async Task<TEntity> UpdateAsync(TEntity entity)
     {
-        try
-        {
-            var updatedEntity = context.Set<TEntity>().Update(entity);
-            await context.SaveChangesAsync();
-            return updatedEntity.Entity;
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error updating entity: {ex.Message}", ex);
-        }
+        var updatedEntity = Context.Set<TEntity>().Update(entity);
+        await Context.SaveChangesAsync();
+        return updatedEntity.Entity;
     }
 
     public async Task DeleteAsync(int id)
     {
-        try
-        {
-            var entity = await context.Set<TEntity>().FindAsync(id);
+        var entity = await Context.Set<TEntity>().FindAsync(id);
 
-            if (entity == null)
-            {
-                throw new Exception($"Entity with id {id} not found");
-            }
-            
-            context.Set<TEntity>().Remove(entity);
-            await context.SaveChangesAsync();
-        }
-        catch (Exception ex)
+        if (entity == null)
         {
-            throw new Exception($"Error while deleting entity with id {id}: {ex.Message}", ex);
+            throw new KeyNotFoundException($"Entity with id {id} not found");
         }
+
+        Context.Set<TEntity>().Remove(entity);
+        await Context.SaveChangesAsync();
     }
 
     public async Task DeleteAllAsync()
     {
-        try
-        {
-            var entities = await context.Set<TEntity>().ToListAsync();
-            context.Set<TEntity>().RemoveRange(entities);
-            await context.SaveChangesAsync();
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"Error while deleting entities: {ex.Message}", ex);
-        }
+        var entities = await Context.Set<TEntity>().ToListAsync();
+        Context.Set<TEntity>().RemoveRange(entities);
+        await Context.SaveChangesAsync();
     }
 }

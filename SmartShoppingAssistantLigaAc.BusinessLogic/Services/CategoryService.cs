@@ -10,14 +10,12 @@ public class CategoryService(IRepository<Category> categoryRepository) : ICatego
     public async Task<List<CategoryGetDTO>> GetAllAsync()
     {
         var categories = await categoryRepository.GetAllAsync();
-        
         return categories.Select(MapToDTO).ToList();
     }
 
     public async Task<CategoryGetDTO> GetByIdAsync(int id)
     {
         var category = await categoryRepository.GetByIdAsync(id);
-        
         return MapToDTO(category);
     }
 
@@ -28,7 +26,7 @@ public class CategoryService(IRepository<Category> categoryRepository) : ICatego
             Name = dto.Name,
             Description = dto.Description
         };
-        
+
         var created = await categoryRepository.AddAsync(category);
         return MapToDTO(created);
     }
@@ -36,10 +34,10 @@ public class CategoryService(IRepository<Category> categoryRepository) : ICatego
     public async Task<CategoryGetDTO> UpdateAsync(int id, CategoryUpdateDTO dto)
     {
         var category = await categoryRepository.GetByIdAsync(id);
-        
+
         category.Name = dto.Name;
         category.Description = dto.Description;
-        
+
         var updated = await categoryRepository.UpdateAsync(category);
         return MapToDTO(updated);
     }
@@ -48,7 +46,7 @@ public class CategoryService(IRepository<Category> categoryRepository) : ICatego
     {
         await categoryRepository.DeleteAsync(id);
     }
-    
+
     private static CategoryGetDTO MapToDTO(Category category) => new()
     {
         Id = category.Id,

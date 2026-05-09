@@ -23,15 +23,15 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
 
             modelBuilder.Entity("ProductCategories", b =>
                 {
-                    b.Property<int>("CategoriesId")
+                    b.Property<int>("CategoryId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ProductsId")
+                    b.Property<int>("ProductId")
                         .HasColumnType("integer");
 
-                    b.HasKey("CategoriesId", "ProductsId");
+                    b.HasKey("CategoryId", "ProductId");
 
-                    b.HasIndex("ProductsId");
+                    b.HasIndex("ProductId");
 
                     b.ToTable("ProductCategories");
                 });
@@ -157,13 +157,13 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
                 {
                     b.HasOne("SmartShoppingAssistantLigaAc.DataAccess.Entities.Category", null)
                         .WithMany()
-                        .HasForeignKey("CategoriesId")
+                        .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("SmartShoppingAssistantLigaAc.DataAccess.Entities.Product", null)
                         .WithMany()
-                        .HasForeignKey("ProductsId")
+                        .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

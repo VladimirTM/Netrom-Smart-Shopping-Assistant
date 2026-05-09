@@ -6,8 +6,8 @@ public interface ICartItemService
 {
     Task<CartGetDTO> GetAllAsync();
     Task<CartItemGetDTO> GetByIdAsync(int id);
-    Task<CartItemGetDTO> CreateAsync(CartItemCreateDTO dto);
-    Task<CartItemGetDTO> UpdateAsync(int itemId, CartItemUpdateDTO dto);
-    Task DeleteAsync(int id);
+    Task<CartGetDTO> CreateAsync(CartItemCreateDTO dto);
+    Task<CartGetDTO> UpdateAsync(int id, CartItemUpdateDTO dto);
+    Task<CartGetDTO> DeleteAsync(int id);
     Task DeleteAllAsync();
 }
