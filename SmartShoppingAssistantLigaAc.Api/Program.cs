@@ -49,6 +49,7 @@ builder.Services.AddSingleton<IChatClient>(
         .Build());
 
 builder.Services.AddScoped<IPromotionCheckerAgent, PromotionCheckerAgent>();
+builder.Services.AddScoped<ISuggestionComposerAgent, SuggestionComposerAgent>();
 
 var app = builder.Build();
 

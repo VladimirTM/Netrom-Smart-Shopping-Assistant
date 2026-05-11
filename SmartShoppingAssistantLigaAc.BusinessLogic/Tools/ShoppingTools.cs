@@ -13,4 +13,12 @@ public static class ShoppingTools
     {
         return await promotionService.GetForProductAsync(productId);
     }
+
+    [Description("Search for all products available in a specific category.")]
+    public static async Task<List<ProductGetDTO>> SearchProductsByCategory(
+        [Description("The category ID to search products in")] int categoryId,
+        IProductService productService)
+    {
+        return await productService.GetAllAsync(categoryId);
+    }
 }
