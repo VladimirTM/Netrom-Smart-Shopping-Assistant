@@ -70,4 +70,11 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
         await cartItemService.DeleteAllAsync();
         return NoContent();
     }
+    
+    [HttpPost("analyze")]
+    public async Task<IActionResult> AnalyzeCart()
+    {
+        var analysisResponse = await cartItemService.AnalyzeCartAsync();
+        return Ok(analysisResponse);
+    }
 }

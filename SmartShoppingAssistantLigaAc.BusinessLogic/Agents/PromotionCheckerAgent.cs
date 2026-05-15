@@ -7,7 +7,7 @@ using SmartShoppingAssistantLigaAc.BusinessLogic.Tools;
 
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.Agents;
 
-public class PromotionCheckerAgent(IChatClient chatClient, IPromotionService promotionService) : IPromotionCheckerAgent
+public sealed class PromotionCheckerAgent(IChatClient chatClient, IPromotionService promotionService) : IPromotionCheckerAgent
 {
     public ChatClientAgent Build(string cartJson)
     {

@@ -11,12 +11,9 @@ using SmartShoppingAssistantLigaAc.BusinessLogic.Agents;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var connectionString = builder.Configuration.GetConnectionString("SmartShoppingAssistantContext");
@@ -31,6 +28,7 @@ builder.Services.AddScoped<IRepository<Category>, BaseRepository<Category>>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 
 builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
+builder.Services.AddScoped<IRepository<Promotion>, PromotionRepository>();
 builder.Services.AddScoped<IPromotionService, PromotionService>();
 
 builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
@@ -38,7 +36,7 @@ builder.Services.AddScoped<ICartItemService, CartItemService>();
 
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"]
                    ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
-var openAiModel = builder.Configuration["OpenAI:ModelId"] ?? "gpt-4o";
+var openAiModel = builder.Configuration["OpenAI:ModelId"] ?? "gpt-4o-mini";
 
 builder.Services.AddSingleton<IChatClient>(
     new OpenAIClient(openAiApiKey)
@@ -50,6 +48,17 @@ builder.Services.AddSingleton<IChatClient>(
 
 builder.Services.AddScoped<IPromotionCheckerAgent, PromotionCheckerAgent>();
 builder.Services.AddScoped<ISuggestionComposerAgent, SuggestionComposerAgent>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAnyOrigin",
+        corsPolicyBuilder =>
+        {
+            corsPolicyBuilder.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
+});
 
 var app = builder.Build();
 

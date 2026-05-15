@@ -1,4 +1,9 @@
+using System.Text.Json;
+using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.AI;
+using SmartShoppingAssistantLigaAc.BusinessLogic.Agents;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
+using SmartShoppingAssistantLigaAc.BusinessLogic.Models;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 using SmartShoppingAssistantLigaAc.DataAccess.Entities;
 using SmartShoppingAssistantLigaAc.DataAccess.Entities.Enums;
@@ -8,7 +13,10 @@ namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
 public class CartItemService(
     ICartItemRepository cartItemRepository,
-    IRepository<Promotion> promotionRepository) : ICartItemService
+    IRepository<Promotion> promotionRepository, 
+    IRepository<Category> categoryRepository, 
+    IPromotionCheckerAgent promotionCheckerAgent,
+    ISuggestionComposerAgent suggestionComposerAgent) : ICartItemService
 {
     public async Task<CartGetDTO> GetAllAsync()
     {
@@ -120,6 +128,59 @@ public class CartItemService(
                     .Sum(),
             _ => 0
         };
+    }
+
+    public async Task<AnalysisResponse> AnalyzeCartAsync()
+    {
+        var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync();
+        var categories = await categoryRepository.GetAllAsync();
+        var cartJson = JsonSerializer.Serialize(cartItems.Select(c => new
+        {
+            c.ProductId,
+            ProductName = c.Product.Name,
+            c.Product.Price,
+            c.Quantity,
+            LineTotal = c.Product.Price * c.Quantity,
+            Categories = c.Product.Categories.Select(cat => new {CategoryId = cat.Id, CategoryName = cat.Name}).ToList()
+        }));
+        
+        var categoryJson = JsonSerializer.Serialize((categories.Select(c => new
+        {
+            CategoryId = c.Id,
+            CategoryName = c.Name
+        })));
+
+        var promotionAgent = promotionCheckerAgent.Build(cartJson);
+        var suggestionAgent = suggestionComposerAgent.Build(cartJson, categoryJson);
+        
+        var workflow = new WorkflowBuilder(promotionAgent).AddEdge(promotionAgent, suggestionAgent)
+            .WithOutputFrom(suggestionAgent)
+            .Build();
+        
+        var chatMessage = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Analyse the current cart and suggest improvements.")
+        };
+        
+        await using var result = await InProcessExecution.RunStreamingAsync(workflow, chatMessage);
+        await result.TrySendMessageAsync(new TurnToken(emitEvents: true));
+        
+        var jsonBuilder = new System.Text.StringBuilder();
+
+        await foreach (var message in result.WatchStreamAsync())
+        {
+            if (message is AgentResponseUpdateEvent update && update.ExecutorId.StartsWith("SuggestionComposer"))
+            {
+                jsonBuilder.Append(update.Update.Text);
+            }
+            else if (message is WorkflowErrorEvent errorEvent)
+            {
+                throw new InvalidOperationException(errorEvent.Exception?.Message);
+            }
+        }
+        
+        var json = jsonBuilder.ToString();
+        return JsonSerializer.Deserialize<AnalysisResponse>(json) ?? throw new InvalidOperationException("Failed to deserialize analysis response.");
     }
 
     private static CartItemGetDTO MapToDTO(CartItem cartItem) => new()
