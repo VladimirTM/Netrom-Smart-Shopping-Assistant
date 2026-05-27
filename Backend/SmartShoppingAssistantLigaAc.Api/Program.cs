@@ -70,6 +70,8 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/openapi/v1.json", "SmartShoppingAssistant API v1"));
 }
 
+app.UseCors("AllowAnyOrigin");
+
 app.UseHttpsRedirection();
 
 app.UseAuthorization();

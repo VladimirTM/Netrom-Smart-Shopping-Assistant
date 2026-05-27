@@ -20,12 +20,41 @@ public sealed class PromotionCheckerAgent(IChatClient chatClient, IPromotionServ
                 ChatOptions = new ChatOptions
                 {
                     Instructions = $"""
-                                    You check promotions. Here is the current cart:
+                                    You are a promotion analysis agent. Here is the current cart:
                                     {cartJson}
 
-                                    1. Call GetPromotionsForProduct for each product in the cart.
-                                    2. Compare each promotion's rules against the cart quantities/totals.
-                                    3. For near-miss deals, calculate the savings the user would get.
+                                    For each product in the cart:
+                                    1. Call GetPromotionsForProduct(productId) to retrieve all active promotions.
+
+                                    2. Classify each promotion as ACTIVE or NEAR-MISS:
+                                       - Quantity promotions: sum cart quantity for items in the promotion scope (product-specific, category-wide, or cart-wide).
+                                         ACTIVE: currentQuantity >= threshold
+                                         NEAR-MISS: currentQuantity < threshold AND (threshold - currentQuantity) <= 1
+                                       - CartTotal promotions: sum (price * quantity) for items in the promotion scope.
+                                         ACTIVE: currentTotal >= threshold
+                                         NEAR-MISS: currentTotal < threshold AND (threshold - currentTotal) <= (threshold * 0.20)
+
+                                    3. For each ACTIVE deal, populate:
+                                       - promotionId: promotion.Id
+                                       - promotionName: promotion.Name
+                                       - productId: promotion.ProductId (null if category-based or cart-wide)
+                                       - categoryId: promotion.CategoryId (null if product-specific or cart-wide)
+                                       - description: human-readable description of what the deal gives
+                                       - action: null
+                                       - nearMissDelta: null
+                                       - savings: estimated monetary discount in RON
+
+                                    4. For each NEAR-MISS deal, populate:
+                                       - promotionId: promotion.Id
+                                       - promotionName: promotion.Name
+                                       - productId: promotion.ProductId (null if category-based or cart-wide)
+                                       - categoryId: promotion.CategoryId (null if product-specific or cart-wide)
+                                       - description: human-readable description of what the deal gives
+                                       - action: human-readable instruction, e.g. "Add 1 more Banana" or "Spend 12.50 RON more"
+                                       - nearMissDelta: (threshold - currentQuantity) for Quantity; (threshold - currentTotal) rounded to 2 decimal places for CartTotal
+                                       - savings: estimated discount once the threshold is met
+
+                                    5. Each promotion must appear at most once across activeDeals and nearMissDeals.
                                     """,
                     ResponseFormat = ChatResponseFormat.ForJsonSchema<PromotionAnalysis>(),
                     Tools =

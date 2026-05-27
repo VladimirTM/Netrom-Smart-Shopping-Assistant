@@ -51,13 +51,23 @@ public class CartItemService(
 
     public async Task<CartGetDTO> CreateAsync(CartItemCreateDTO dto)
     {
-        var cartItem = new CartItem
-        {
-            ProductId = dto.ProductId,
-            Quantity = dto.Quantity
-        };
+        var existing = (await cartItemRepository.GetAllAsync())
+            .FirstOrDefault(i => i.ProductId == dto.ProductId);
 
-        await cartItemRepository.AddAsync(cartItem);
+        if (existing is not null)
+        {
+            existing.Quantity += dto.Quantity;
+            await cartItemRepository.UpdateAsync(existing);
+        }
+        else
+        {
+            await cartItemRepository.AddAsync(new CartItem
+            {
+                ProductId = dto.ProductId,
+                Quantity = dto.Quantity
+            });
+        }
+
         return await GetAllAsync();
     }
 
@@ -133,6 +143,16 @@ public class CartItemService(
     public async Task<AnalysisResponse> AnalyzeCartAsync()
     {
         var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync();
+
+        if (cartItems.Count == 0)
+        {
+            return new AnalysisResponse
+            {
+                Summary = "Your cart is empty. Add some products to get personalized suggestions.",
+                Suggestions = []
+            };
+        }
+
         var categories = await categoryRepository.GetAllAsync();
         var cartJson = JsonSerializer.Serialize(cartItems.Select(c => new
         {
@@ -180,7 +200,14 @@ public class CartItemService(
         }
         
         var json = jsonBuilder.ToString();
-        return JsonSerializer.Deserialize<AnalysisResponse>(json) ?? throw new InvalidOperationException("Failed to deserialize analysis response.");
+        var response = JsonSerializer.Deserialize<AnalysisResponse>(json) ?? throw new InvalidOperationException("Failed to deserialize analysis response.");
+
+        foreach (var suggestion in response.Suggestions)
+        {
+            if (suggestion.Savings == 0) suggestion.Savings = null;
+        }
+
+        return response;
     }
 
     private static CartItemGetDTO MapToDTO(CartItem cartItem) => new()

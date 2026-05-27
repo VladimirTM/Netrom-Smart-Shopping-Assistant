@@ -20,7 +20,7 @@ public sealed class SuggestionComposerAgent(IChatClient chatClient, IProductServ
                 ChatOptions = new ChatOptions
                 {
                     Instructions = $"""
-                                    You are a smart shopping suggestion assistant.
+                                    You are a smart shopping suggestion assistant. You will receive cart data and a promotion analysis from the previous agent.
 
                                     Current cart:
                                     {cartJson}
@@ -28,14 +28,23 @@ public sealed class SuggestionComposerAgent(IChatClient chatClient, IProductServ
                                     Available categories:
                                     {categoriesJson}
 
-                                    1. Call SearchProductsByCategory for relevant categories to discover available products.
-                                    2. Suggest products relevant to what the user already has in their cart.
-                                    3. Prioritize products that would help the user activate near-miss promotions from the analysis.
-                                    4. Do not suggest products already present in the cart.
-                                    5. Return at most 5 suggestions.
-                                    6. For each suggestion, populate name, price, and quantity (recommended quantity, default 1) from the SearchProductsByCategory results.
-                                    7. Include a brief summary of the overall cart and the suggestions.
-                                    8. If a suggestion helps unlock a promotion, set savings to the estimated discount value, otherwise leave it null.
+                                    1. Review the nearMissDeals from the promotion analysis passed to you — each near-miss deal has a nearMissDelta field indicating exactly how much more quantity or cart value is needed.
+                                    2. Call SearchProductsByCategory for relevant categories to discover available products. For near-miss deals that have a categoryId, call SearchProductsByCategory(categoryId). For product-specific near-miss deals, use the product's category from the cart data.
+                                    3. Prioritize suggestions that activate near-miss promotions:
+                                       - Quantity-based near-miss: set the suggestion's quantity to the nearMissDelta value (the exact number of units still needed).
+                                       - CartTotal-based near-miss: suggest products whose (price * quantity) is close to the nearMissDelta value.
+                                    4. Fill any remaining suggestion slots with complementary products relevant to the cart's categories.
+                                    5. Do not suggest products already present in the cart.
+                                    6. Return at most 5 suggestions.
+                                    7. For each suggestion, populate from the SearchProductsByCategory tool results:
+                                       - productId: the product's Id
+                                       - name: the product's Name
+                                       - price: the product's Price
+                                       - imageUrl: the product's ImageUrl (copy exactly as returned; use null if absent)
+                                       - quantity: as described in step 3 (default to 1 for complementary suggestions)
+                                       - reason: brief explanation referencing the specific promotion name if applicable
+                                       - savings: estimated discount in RON if this suggestion activates a promotion; must be null (not 0) if it does not
+                                    8. Include a brief summary of the overall cart analysis and what the suggestions aim to achieve.
                                     """,
                     ResponseFormat = ChatResponseFormat.ForJsonSchema<AnalysisResponse>(),
                     Tools =
