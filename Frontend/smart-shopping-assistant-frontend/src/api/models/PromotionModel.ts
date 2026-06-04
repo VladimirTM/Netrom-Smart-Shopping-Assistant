@@ -1,12 +1,14 @@
-export enum PromotionType {
-  Quantity = 0,
-  CartTotal = 1,
-}
+export const PromotionType = {
+  Quantity: 0,
+  CartTotal: 1,
+} as const;
+export type PromotionType = (typeof PromotionType)[keyof typeof PromotionType];
 
-export enum PromotionReward {
-  FreeItems = 0,
-  PercentDiscount = 1,
-}
+export const PromotionReward = {
+  FreeItems: 0,
+  PercentDiscount: 1,
+} as const;
+export type PromotionReward = (typeof PromotionReward)[keyof typeof PromotionReward];
 
 export interface PromotionModel {
   id: number;

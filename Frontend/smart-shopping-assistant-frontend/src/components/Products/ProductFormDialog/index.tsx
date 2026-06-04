@@ -99,7 +99,7 @@ function ProductFormDialog({ product, onClose, onSaved }: ProductFormDialogProps
             fullWidth
             required
             type="number"
-            inputProps={{ min: 0, step: 0.01 }}
+            slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
           />
           <TextField
             label="Description"

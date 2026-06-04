@@ -134,7 +134,7 @@ function PromotionFormDialog({
             fullWidth
             required
             type="number"
-            inputProps={{ min: 0, step: type === PromotionType.CartTotal ? 0.01 : 1 }}
+            slotProps={{ htmlInput: { min: 0, step: type === PromotionType.CartTotal ? 0.01 : 1 } }}
           />
           <FormControl fullWidth required>
             <InputLabel>Reward</InputLabel>
@@ -160,7 +160,7 @@ function PromotionFormDialog({
             fullWidth
             required
             type="number"
-            inputProps={{ min: 0 }}
+            slotProps={{ htmlInput: { min: 0 } }}
           />
           <TextField
             label="Product ID (optional)"
@@ -168,7 +168,7 @@ function PromotionFormDialog({
             onChange={(e) => setProductId(e.target.value)}
             fullWidth
             type="number"
-            inputProps={{ min: 1 }}
+            slotProps={{ htmlInput: { min: 1 } }}
           />
           <TextField
             label="Category ID (optional)"
@@ -176,7 +176,7 @@ function PromotionFormDialog({
             onChange={(e) => setCategoryId(e.target.value)}
             fullWidth
             type="number"
-            inputProps={{ min: 1 }}
+            slotProps={{ htmlInput: { min: 1 } }}
           />
           <FormControlLabel
             control={

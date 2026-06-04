@@ -127,18 +127,18 @@ function Promotions() {
                   <TableCell sx={{ fontWeight: 500 }}>
                     {promotion.name}
                   </TableCell>
-                  <TableCell color="text.secondary">
+                  <TableCell sx={{ color: "text.secondary" }}>
                     {TYPE_LABELS[promotion.type]}
                   </TableCell>
-                  <TableCell color="text.secondary">
+                  <TableCell sx={{ color: "text.secondary" }}>
                     {promotion.type === PromotionType.CartTotal
                       ? `${promotion.threshold.toFixed(2)} RON`
                       : `${promotion.threshold} items`}
                   </TableCell>
-                  <TableCell color="text.secondary">
+                  <TableCell sx={{ color: "text.secondary" }}>
                     {REWARD_LABELS[promotion.reward]}
                   </TableCell>
-                  <TableCell color="text.secondary">
+                  <TableCell sx={{ color: "text.secondary" }}>
                     {promotion.reward === PromotionReward.PercentDiscount
                       ? `${promotion.rewardValue}%`
                       : `${promotion.rewardValue} items`}
