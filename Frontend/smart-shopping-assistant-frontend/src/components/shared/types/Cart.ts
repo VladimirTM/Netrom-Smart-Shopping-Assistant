@@ -2,8 +2,6 @@ import type {
   CartModel,
   CartItemModel,
   AppliedPromotionModel,
-  SuggestionModel,
-  AnalysisResponseModel,
 } from "../../../api/models/CartModel";
 
 export interface CartItem {
@@ -28,21 +26,6 @@ export interface Cart {
   total: number;
 }
 
-export interface Suggestion {
-  productId: number;
-  name: string;
-  price: number;
-  quantity: number;
-  reason: string;
-  imageUrl: string | null;
-  savings: number | null;
-}
-
-export interface AnalysisResponse {
-  summary: string;
-  suggestions: Suggestion[];
-}
-
 export function toCartItem(dto: CartItemModel): CartItem {
   return {
     id: dto.id,
@@ -54,7 +37,9 @@ export function toCartItem(dto: CartItemModel): CartItem {
   };
 }
 
-export function toAppliedPromotion(dto: AppliedPromotionModel): AppliedPromotion {
+export function toAppliedPromotion(
+  dto: AppliedPromotionModel,
+): AppliedPromotion {
   return { promotionName: dto.promotionName, discount: dto.discount };
 }
 
@@ -65,24 +50,5 @@ export function toCart(dto: CartModel): Cart {
     appliedPromotions: dto.appliedPromotions.map(toAppliedPromotion),
     totalDiscount: dto.totalDiscount,
     total: dto.total,
-  };
-}
-
-export function toSuggestion(dto: SuggestionModel): Suggestion {
-  return {
-    productId: dto.productId,
-    name: dto.name,
-    price: dto.price,
-    quantity: dto.quantity,
-    reason: dto.reason,
-    imageUrl: dto.imageUrl,
-    savings: dto.savings,
-  };
-}
-
-export function toAnalysisResponse(dto: AnalysisResponseModel): AnalysisResponse {
-  return {
-    summary: dto.summary,
-    suggestions: dto.suggestions.map(toSuggestion),
   };
 }

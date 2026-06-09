@@ -6,6 +6,7 @@ import {
   IconButton,
   List,
   ListItem,
+  Stack,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -14,16 +15,19 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useCart } from "../../context/CartContent/cart-context";
-
-const fmt = (value: number) =>
-  new Intl.NumberFormat("ro-RO", { style: "currency", currency: "RON" }).format(value);
+import { useState } from "react";
+import AnalyzeDialog from "./AnalyzeDialog";
+import { fmt } from "../../utils/currency";
 
 function CartDrawer() {
   const { cart, open, closeCart, updateQuantity, removeProduct } = useCart();
 
   const isEmpty = cart === null || cart.items.length === 0;
-  const itemCount = cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const itemCount =
+    cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const [analyzeOpen, setAnalyzeOpen] = useState(false);
 
   return (
     <Drawer anchor="right" open={open} onClose={closeCart}>
@@ -91,7 +95,11 @@ function CartDrawer() {
             <Typography variant="h6" color="text.secondary">
               Your cart is empty
             </Typography>
-            <Typography variant="body2" color="text.disabled" sx={{ textAlign: "center" }}>
+            <Typography
+              variant="body2"
+              color="text.disabled"
+              sx={{ textAlign: "center" }}
+            >
               Add products from the shop to get started.
             </Typography>
             <Button variant="outlined" onClick={closeCart} sx={{ mt: 1 }}>
@@ -127,7 +135,11 @@ function CartDrawer() {
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Box>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.25 }}
+                  >
                     {fmt(item.price)} each
                   </Typography>
                   <Box
@@ -149,22 +161,35 @@ function CartDrawer() {
                     >
                       <IconButton
                         size="small"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        onClick={() =>
+                          updateQuantity(item.id, item.quantity - 1)
+                        }
                         disabled={item.quantity <= 1}
                       >
                         <RemoveIcon fontSize="small" />
                       </IconButton>
-                      <Typography sx={{ mx: 1.5, minWidth: 20, textAlign: "center", fontWeight: 500 }}>
+                      <Typography
+                        sx={{
+                          mx: 1.5,
+                          minWidth: 20,
+                          textAlign: "center",
+                          fontWeight: 500,
+                        }}
+                      >
                         {item.quantity}
                       </Typography>
                       <IconButton
                         size="small"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        onClick={() =>
+                          updateQuantity(item.id, item.quantity + 1)
+                        }
                       >
                         <AddIcon fontSize="small" />
                       </IconButton>
                     </Box>
-                    <Typography sx={{ fontWeight: 600 }}>{fmt(item.subtotal)}</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {fmt(item.subtotal)}
+                    </Typography>
                   </Box>
                   <Divider sx={{ mt: 1.5 }} />
                 </ListItem>
@@ -172,15 +197,32 @@ function CartDrawer() {
             </List>
 
             {/* Summary & Checkout */}
-            <Box sx={{ px: 2.5, py: 2, borderTop: "1px solid", borderColor: "divider" }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}>
+            <Box
+              sx={{
+                px: 2.5,
+                py: 2,
+                borderTop: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  mb: 0.75,
+                }}
+              >
                 <Typography color="text.secondary">Subtotal</Typography>
                 <Typography>{fmt(cart.subtotal)}</Typography>
               </Box>
               {cart.appliedPromotions.map((promotion) => (
                 <Box
                   key={promotion.promotionName}
-                  sx={{ display: "flex", justifyContent: "space-between", mb: 0.75 }}
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    mb: 0.75,
+                  }}
                 >
                   <Typography color="success.main" variant="body2">
                     {promotion.promotionName}
@@ -191,7 +233,9 @@ function CartDrawer() {
                 </Box>
               ))}
               <Divider sx={{ my: 1.5 }} />
-              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+              <Box
+                sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
+              >
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   Total
                 </Typography>
@@ -199,19 +243,32 @@ function CartDrawer() {
                   {fmt(cart.total)}
                 </Typography>
               </Box>
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                startIcon={<ShoppingCartIcon />}
-                sx={{ borderRadius: 2 }}
-              >
-                Proceed to Checkout
-              </Button>
+              <Stack spacing={1}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  size="large"
+                  startIcon={<AutoAwesomeIcon />}
+                  sx={{ borderRadius: 2 }}
+                  onClick={() => setAnalyzeOpen(true)}
+                >
+                  AI Analyze
+                </Button>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  startIcon={<ShoppingCartIcon />}
+                  sx={{ borderRadius: 2 }}
+                >
+                  Proceed to Checkout
+                </Button>
+              </Stack>
             </Box>
           </>
         )}
       </Box>
+      {analyzeOpen && <AnalyzeDialog onClose={() => setAnalyzeOpen(false)} />}
     </Drawer>
   );
 }

@@ -3,14 +3,13 @@ import type {
   CartModel,
   CartItemCreateInput,
   CartItemUpdateInput,
-  AnalysisResponseModel,
 } from "../models/CartModel";
+import { toCart, type Cart } from "../../components/shared/types/Cart";
+import type { AnalysisModel } from "../models/AnalysisModel";
 import {
-  toCart,
-  toAnalysisResponse,
-  type Cart,
-  type AnalysisResponse,
-} from "../../components/shared/types/Cart";
+  toAnalysis,
+  type Analysis,
+} from "../../components/shared/types/Analysis";
 
 export const cartApi = {
   getCart: async (): Promise<Cart> => {
@@ -26,7 +25,7 @@ export const cartApi = {
     return toCart(await http.remove<CartModel>(`/cart/items/${id}`));
   },
   clearCart: (): Promise<void> => http.remove<void>("/cart"),
-  analyzeCart: async (): Promise<AnalysisResponse> => {
-    return toAnalysisResponse(await http.post<AnalysisResponseModel>("/cart/analyze", {}));
+  analyze: async (): Promise<Analysis> => {
+    return toAnalysis(await http.post<AnalysisModel>("/cart/analyze", {}));
   },
 };

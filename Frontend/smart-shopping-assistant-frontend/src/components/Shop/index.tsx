@@ -7,6 +7,7 @@ import {
   CardContent,
   CardMedia,
   Checkbox,
+  Chip,
   CircularProgress,
   Container,
   Divider,
@@ -27,9 +28,7 @@ import { categoriesApi } from "../../api/clients/CategoryApiClient";
 import type { Product } from "../shared/types/Product";
 import type { Category } from "../shared/types/Category";
 import { useCart } from "../../context/CartContent/cart-context";
-
-const fmt = (value: number) =>
-  new Intl.NumberFormat("ro-RO", { style: "currency", currency: "RON" }).format(value);
+import { fmt } from "../../utils/currency";
 
 type SortOption = "price-asc" | "price-desc" | "name-asc" | "name-desc";
 
@@ -53,15 +52,22 @@ function Shop() {
         setCategories(cats);
         if (prods.length > 0) {
           const prices = prods.map((p) => p.price);
-          setPriceRange([Math.floor(Math.min(...prices)), Math.ceil(Math.max(...prices))]);
+          setPriceRange([
+            Math.floor(Math.min(...prices)),
+            Math.ceil(Math.max(...prices)),
+          ]);
         }
       })
       .catch((err) => setError((err as Error).message))
       .finally(() => setLoading(false));
   }, []);
 
-  const priceMin = products.length ? Math.floor(Math.min(...products.map((p) => p.price))) : 0;
-  const priceMax = products.length ? Math.ceil(Math.max(...products.map((p) => p.price))) : 10000;
+  const priceMin = products.length
+    ? Math.floor(Math.min(...products.map((p) => p.price)))
+    : 0;
+  const priceMax = products.length
+    ? Math.ceil(Math.max(...products.map((p) => p.price)))
+    : 10000;
 
   const toggleCategory = (id: number) => {
     setSelectedCategories((prev) =>
@@ -69,9 +75,21 @@ function Shop() {
     );
   };
 
+  const isFiltered =
+    selectedCategories.length > 0 ||
+    priceRange[0] > priceMin ||
+    priceRange[1] < priceMax;
+
+  function clearFilters() {
+    setSelectedCategories([]);
+    setPriceRange([priceMin, priceMax]);
+  }
+
   const visibleProducts = useMemo(() => {
     let filtered = products.filter((p) => {
-      const matchesSearch = p.name.toLowerCase().includes(search.trim().toLowerCase());
+      const matchesSearch = p.name
+        .toLowerCase()
+        .includes(search.trim().toLowerCase());
       const matchesCategory =
         selectedCategories.length === 0 ||
         p.categories.some((c) => selectedCategories.includes(c.id));
@@ -98,10 +116,24 @@ function Shop() {
       )}
 
       {/* Header row */}
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
-          Shop
-        </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 2,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "baseline", gap: 1.5 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            Shop
+          </Typography>
+          {!loading && (
+            <Typography variant="body2" color="text.secondary">
+              {visibleProducts.length} product{visibleProducts.length !== 1 ? "s" : ""}
+            </Typography>
+          )}
+        </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography variant="body2" color="text.secondary">
             Sort by
@@ -149,12 +181,27 @@ function Shop() {
             top: 72,
           }}
         >
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
-            Filters
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              Filters
+            </Typography>
+            {isFiltered && (
+              <Button size="small" onClick={clearFilters} sx={{ minWidth: 0, p: 0, fontSize: "0.75rem" }}>
+                Clear
+              </Button>
+            )}
+          </Box>
 
           {/* Categories */}
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
             Categories
           </Typography>
           <FormGroup sx={{ mt: 0.5, mb: 2 }}>
@@ -169,9 +216,7 @@ function Shop() {
                     sx={{ py: 0.25 }}
                   />
                 }
-                label={
-                  <Typography variant="body2">{cat.name}</Typography>
-                }
+                label={<Typography variant="body2">{cat.name}</Typography>}
                 sx={{ ml: 0 }}
               />
             ))}
@@ -180,7 +225,15 @@ function Shop() {
           <Divider sx={{ mb: 2 }} />
 
           {/* Price */}
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
             Price
           </Typography>
           <Box sx={{ px: 1, mt: 1.5 }}>
@@ -194,15 +247,26 @@ function Shop() {
               disabled={loading}
             />
             <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-              <Typography variant="caption" color="text.secondary">{fmt(priceRange[0])}</Typography>
-              <Typography variant="caption" color="text.secondary">{fmt(priceRange[1])}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {fmt(priceRange[0])}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {fmt(priceRange[1])}
+              </Typography>
             </Box>
           </Box>
         </Box>
 
         {/* Product grid */}
         {loading ? (
-          <Box sx={{ flexGrow: 1, display: "flex", justifyContent: "center", mt: 8 }}>
+          <Box
+            sx={{
+              flexGrow: 1,
+              display: "flex",
+              justifyContent: "center",
+              mt: 8,
+            }}
+          >
             <CircularProgress />
           </Box>
         ) : (
@@ -237,7 +301,10 @@ function Shop() {
                   }}
                 />
                 <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3, mb: 0.5 }}>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 700, lineHeight: 1.3, mb: 0.5 }}
+                  >
                     {product.name}
                   </Typography>
                   <Typography
@@ -254,7 +321,15 @@ function Shop() {
                   >
                     {product.description}
                   </Typography>
-                  <Typography variant="subtitle2" sx={{ mt: 1, fontWeight: 700, color: "primary.dark" }}>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}>
+                    {product.categories.map((c) => (
+                      <Chip key={c.id} label={c.name} size="small" sx={{ height: 18, fontSize: "0.68rem" }} />
+                    ))}
+                  </Box>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ mt: 1, fontWeight: 700, color: "primary.dark" }}
+                  >
                     {fmt(product.price)}
                   </Typography>
                 </CardContent>
@@ -272,7 +347,10 @@ function Shop() {
               </Card>
             ))}
             {visibleProducts.length === 0 && (
-              <Typography color="text.secondary" sx={{ gridColumn: "1/-1", textAlign: "center", mt: 4 }}>
+              <Typography
+                color="text.secondary"
+                sx={{ gridColumn: "1/-1", textAlign: "center", mt: 4 }}
+              >
                 No products match your filters.
               </Typography>
             )}

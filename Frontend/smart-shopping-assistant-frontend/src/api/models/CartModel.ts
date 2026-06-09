@@ -28,18 +28,3 @@ export interface CartItemCreateInput {
 export interface CartItemUpdateInput {
   quantity: number;
 }
-
-export interface SuggestionModel {
-  productId: number;
-  name: string;
-  price: number;
-  quantity: number;
-  reason: string;
-  imageUrl: string | null;
-  savings: number | null;
-}
-
-export interface AnalysisResponseModel {
-  summary: string;
-  suggestions: SuggestionModel[];
-}
