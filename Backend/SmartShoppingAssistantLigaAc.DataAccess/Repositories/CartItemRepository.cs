@@ -19,11 +19,21 @@ public class CartItemRepository(SmartShoppingAssistantDbContext context) : BaseR
         return cartItem;
     }
 
-    public async Task<List<CartItem>> GetAllWithProductAndCategoriesAsync()
+    public async Task<List<CartItem>> GetAllWithProductAndCategoriesAsync(int userId)
     {
         return await Context.Set<CartItem>()
+            .Where(c => c.UserId == userId)
             .Include(c => c.Product)
                 .ThenInclude(p => p.Categories)
             .ToListAsync();
+    }
+
+    public async Task DeleteAllForUserAsync(int userId)
+    {
+        var items = await Context.Set<CartItem>()
+            .Where(c => c.UserId == userId)
+            .ToListAsync();
+        Context.Set<CartItem>().RemoveRange(items);
+        await Context.SaveChangesAsync();
     }
 }

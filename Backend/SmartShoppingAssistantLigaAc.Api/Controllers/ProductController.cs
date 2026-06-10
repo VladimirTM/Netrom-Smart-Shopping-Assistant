@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
@@ -30,6 +31,7 @@ public class ProductController(IProductService productService) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "admin")]
     public async Task<ActionResult<ProductGetDTO>> Create([FromBody] ProductCreateDTO dto)
     {
         try
@@ -44,6 +46,7 @@ public class ProductController(IProductService productService) : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "admin")]
     public async Task<ActionResult<ProductGetDTO>> Update(int id, [FromBody] ProductUpdateDTO dto)
     {
         try
@@ -58,6 +61,7 @@ public class ProductController(IProductService productService) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "admin")]
     public async Task<IActionResult> Delete(int id)
     {
         try

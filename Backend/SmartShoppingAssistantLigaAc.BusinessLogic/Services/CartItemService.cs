@@ -13,14 +13,14 @@ namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
 public class CartItemService(
     ICartItemRepository cartItemRepository,
-    IRepository<Promotion> promotionRepository, 
-    IRepository<Category> categoryRepository, 
+    IRepository<Promotion> promotionRepository,
+    IRepository<Category> categoryRepository,
     IPromotionCheckerAgent promotionCheckerAgent,
     ISuggestionComposerAgent suggestionComposerAgent) : ICartItemService
 {
-    public async Task<CartGetDTO> GetAllAsync()
+    public async Task<CartGetDTO> GetAllAsync(int userId)
     {
-        var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync();
+        var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync(userId);
         var promotions = (await promotionRepository.GetAllAsync()).Where(p => p.IsActive).ToList();
 
         var subtotal = cartItems.Sum(i => i.Product.Price * i.Quantity);
@@ -49,10 +49,10 @@ public class CartItemService(
         return MapToDTO(cartItem);
     }
 
-    public async Task<CartGetDTO> CreateAsync(CartItemCreateDTO dto)
+    public async Task<CartGetDTO> CreateAsync(CartItemCreateDTO dto, int userId)
     {
-        var existing = (await cartItemRepository.GetAllAsync())
-            .FirstOrDefault(i => i.ProductId == dto.ProductId);
+        var existing = cartItemRepository.GetAllAsQueryable()
+            .FirstOrDefault(i => i.ProductId == dto.ProductId && i.UserId == userId);
 
         if (existing is not null)
         {
@@ -64,32 +64,35 @@ public class CartItemService(
             await cartItemRepository.AddAsync(new CartItem
             {
                 ProductId = dto.ProductId,
-                Quantity = dto.Quantity
+                Quantity = dto.Quantity,
+                UserId = userId
             });
         }
 
-        return await GetAllAsync();
+        return await GetAllAsync(userId);
     }
 
     public async Task<CartGetDTO> UpdateAsync(int id, CartItemUpdateDTO dto)
     {
         var cartItem = await cartItemRepository.GetByIdAsync(id);
-
         cartItem.Quantity = dto.Quantity;
-
         await cartItemRepository.UpdateAsync(cartItem);
-        return await GetAllAsync();
+
+        var userId = cartItem.UserId ?? 0;
+        return await GetAllAsync(userId);
     }
 
     public async Task<CartGetDTO> DeleteAsync(int id)
     {
+        var cartItem = await cartItemRepository.GetByIdAsync(id);
+        var userId = cartItem.UserId ?? 0;
         await cartItemRepository.DeleteAsync(id);
-        return await GetAllAsync();
+        return await GetAllAsync(userId);
     }
 
-    public async Task DeleteAllAsync()
+    public async Task DeleteAllAsync(int userId)
     {
-        await cartItemRepository.DeleteAllAsync();
+        await cartItemRepository.DeleteAllForUserAsync(userId);
     }
 
     private static decimal CalculateDiscount(Promotion promo, List<CartItem> cartItems, decimal cartTotal)
@@ -140,9 +143,9 @@ public class CartItemService(
         };
     }
 
-    public async Task<AnalysisResponse> AnalyzeCartAsync()
+    public async Task<AnalysisResponse> AnalyzeCartAsync(int userId)
     {
-        var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync();
+        var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync(userId);
 
         if (cartItems.Count == 0)
         {
@@ -163,7 +166,7 @@ public class CartItemService(
             LineTotal = c.Product.Price * c.Quantity,
             Categories = c.Product.Categories.Select(cat => new {CategoryId = cat.Id, CategoryName = cat.Name}).ToList()
         }));
-        
+
         var categoryJson = JsonSerializer.Serialize((categories.Select(c => new
         {
             CategoryId = c.Id,
@@ -172,19 +175,19 @@ public class CartItemService(
 
         var promotionAgent = promotionCheckerAgent.Build(cartJson);
         var suggestionAgent = suggestionComposerAgent.Build(cartJson, categoryJson);
-        
+
         var workflow = new WorkflowBuilder(promotionAgent).AddEdge(promotionAgent, suggestionAgent)
             .WithOutputFrom(suggestionAgent)
             .Build();
-        
+
         var chatMessage = new List<ChatMessage>
         {
             new(ChatRole.User, "Analyse the current cart and suggest improvements.")
         };
-        
+
         await using var result = await InProcessExecution.RunStreamingAsync(workflow, chatMessage);
         await result.TrySendMessageAsync(new TurnToken(emitEvents: true));
-        
+
         var jsonBuilder = new System.Text.StringBuilder();
 
         await foreach (var message in result.WatchStreamAsync())
@@ -198,7 +201,7 @@ public class CartItemService(
                 throw new InvalidOperationException(errorEvent.Exception?.Message);
             }
         }
-        
+
         var json = jsonBuilder.ToString();
         var response = JsonSerializer.Deserialize<AnalysisResponse>(json) ?? throw new InvalidOperationException("Failed to deserialize analysis response.");
 
