@@ -6,6 +6,7 @@ public interface IProductService
 {
     Task<List<ProductGetDTO>> GetAllAsync(int? categoryId = null);
     Task<ProductGetDTO> GetByIdAsync(int id);
+    Task<List<ProductGetDTO>> GetRelatedAsync(int productId);
     Task<ProductGetDTO> CreateAsync(ProductCreateDTO dto);
     Task<ProductGetDTO> UpdateAsync(int id, ProductUpdateDTO dto);
     Task DeleteAsync(int id);

@@ -35,6 +35,7 @@ function ProductFormDialog({ product, onClose, onSaved }: ProductFormDialogProps
   const [description, setDescription] = useState(product?.description ?? "");
   const [price, setPrice] = useState(product?.price.toString() ?? "");
   const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? "");
+  const [stockQuantity, setStockQuantity] = useState(product?.stockQuantity.toString() ?? "0");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>(
     product?.categories.map((c) => c.id) ?? []
   );
@@ -56,6 +57,11 @@ function ProductFormDialog({ product, onClose, onSaved }: ProductFormDialogProps
       setError("Price must be a valid non-negative number.");
       return;
     }
+    const parsedStock = parseInt(stockQuantity, 10);
+    if (isNaN(parsedStock) || parsedStock < 0) {
+      setError("Stock quantity must be a valid non-negative integer.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -64,6 +70,7 @@ function ProductFormDialog({ product, onClose, onSaved }: ProductFormDialogProps
         description: description.trim() || undefined,
         price: parsedPrice,
         imageUrl: imageUrl.trim() || undefined,
+        stockQuantity: parsedStock,
         categoryIds: selectedCategoryIds,
       };
       if (isEditing) {
@@ -114,6 +121,15 @@ function ProductFormDialog({ product, onClose, onSaved }: ProductFormDialogProps
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             fullWidth
+          />
+          <TextField
+            label="Stock Quantity"
+            value={stockQuantity}
+            onChange={(e) => setStockQuantity(e.target.value)}
+            fullWidth
+            required
+            type="number"
+            slotProps={{ htmlInput: { min: 0, step: 1 } }}
           />
           <FormControl fullWidth>
             <InputLabel>Categories</InputLabel>

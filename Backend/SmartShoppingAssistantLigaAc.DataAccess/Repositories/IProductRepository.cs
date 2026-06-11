@@ -6,4 +6,5 @@ public interface IProductRepository : IRepository<Product>
 {
     Task<Product> GetByIdWithCategoriesAsync(int id);
     Task<List<Product>> GetAllWithCategoriesAsync();
+    Task<List<Product>> GetRelatedAsync(int productId, int limit = 6);
 }

@@ -8,7 +8,10 @@ import Products from "./components/Products";
 import Promotions from "./components/Promotions";
 import NotFound from "./components/NotFound";
 import Shop from "./components/Shop";
+import ProductDetail from "./components/ProductDetail";
+import Wishlist from "./components/Wishlist";
 import CartProvider from "./context/CartContent/CartProvider";
+import WishlistProvider from "./context/WishlistContext/WishlistProvider";
 import CartDrawer from "./components/CartDrawer";
 import AuthProvider from "./context/AuthContext/AuthProvider";
 import { useAuth } from "./context/AuthContext/auth-context";
@@ -35,6 +38,15 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/shop/:productId" element={<ProductDetail />} />
+        <Route
+          path="/wishlist"
+          element={
+            <ProtectedRoute>
+              <Wishlist />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/categories"
           element={
@@ -70,7 +82,9 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <AppRoutes />
+        <WishlistProvider>
+          <AppRoutes />
+        </WishlistProvider>
       </CartProvider>
     </AuthProvider>
   );

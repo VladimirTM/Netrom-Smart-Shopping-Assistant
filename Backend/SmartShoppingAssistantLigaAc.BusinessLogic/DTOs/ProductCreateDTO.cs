@@ -6,5 +6,6 @@ public class ProductCreateDTO
     public string? Description { get; set; }
     public decimal Price { get; set; }
     public string? ImageUrl { get; set; }
+    public int StockQuantity { get; set; }
     public List<int> CategoryIds { get; set; } = [];
 }

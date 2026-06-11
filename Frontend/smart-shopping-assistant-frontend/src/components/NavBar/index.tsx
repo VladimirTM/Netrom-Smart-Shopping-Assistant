@@ -18,10 +18,15 @@ import logo from "../../assets/logo.png";
 import { useState } from "react";
 import { useCart } from "../../context/CartContent/cart-context";
 import { useAuth } from "../../context/AuthContext/auth-context";
+import { useWishlist } from "../../context/WishlistContext/wishlist-context";
+import { useThemeMode } from "../../context/ThemeContext/theme-context";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import LogoutIcon from "@mui/icons-material/Logout";
 import LoginIcon from "@mui/icons-material/Login";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import LightModeIcon from "@mui/icons-material/LightMode";
 
 const navButtonSx = {
   color: "rgba(255,255,255,0.75)",
@@ -47,6 +52,8 @@ function NavBar() {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const { cart, openCart } = useCart();
+  const { items: wishlistItems } = useWishlist();
+  const { mode, toggleMode } = useThemeMode();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
   function handleLogout() {
@@ -101,11 +108,33 @@ function NavBar() {
               </Button>
             </>
           ) : (
-            <Button component={NavLink} to="/shop" sx={navButtonSx}>
-              Shop
-            </Button>
+            <>
+              <Button component={NavLink} to="/shop" sx={navButtonSx}>
+                Shop
+              </Button>
+              {isAuthenticated && (
+                <Button component={NavLink} to="/wishlist" sx={navButtonSx}>
+                  Wishlist
+                </Button>
+              )}
+            </>
           )}
         </Box>
+
+        {/* Wishlist icon — users only */}
+        {isAuthenticated && !isAdmin && (
+          <IconButton
+            onClick={() => navigate("/wishlist")}
+            sx={{
+              color: "rgba(255,255,255,0.8)",
+              "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
+            }}
+          >
+            <Badge badgeContent={wishlistItems.size} color="error">
+              <FavoriteBorderIcon />
+            </Badge>
+          </IconButton>
+        )}
 
         {/* Cart — users only */}
         {isAuthenticated && !isAdmin && (
@@ -126,6 +155,17 @@ function NavBar() {
             </Badge>
           </IconButton>
         )}
+
+        {/* Dark mode toggle */}
+        <IconButton
+          onClick={toggleMode}
+          sx={{
+            color: "rgba(255,255,255,0.8)",
+            "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
+          }}
+        >
+          {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+        </IconButton>
 
         {/* Auth buttons / avatar */}
         {isAuthenticated ? (

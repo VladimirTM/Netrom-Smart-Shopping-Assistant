@@ -7,6 +7,13 @@ export const productsApi = {
     const data = await http.get<ProductModel[]>("/products");
     return data.map(toProduct);
   },
+  getById: async (id: number): Promise<Product> => {
+    return toProduct(await http.get<ProductModel>(`/products/${id}`));
+  },
+  getRelated: async (id: number): Promise<Product[]> => {
+    const data = await http.get<ProductModel[]>(`/products/${id}/related`);
+    return data.map(toProduct);
+  },
   create: async (data: ProductInput): Promise<Product> => {
     return toProduct(await http.post<ProductModel>("/products", data));
   },

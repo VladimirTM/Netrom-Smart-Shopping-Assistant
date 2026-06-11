@@ -98,7 +98,7 @@ function Products() {
         <TableContainer component={Paper} elevation={2}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: "grey.100" }}>
+              <TableRow sx={{ bgcolor: "action.hover" }}>
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Price</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Categories</TableCell>

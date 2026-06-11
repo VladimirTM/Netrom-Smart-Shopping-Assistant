@@ -30,6 +30,20 @@ public class ProductController(IProductService productService) : ControllerBase
         }
     }
 
+    [HttpGet("{id}/related")]
+    public async Task<ActionResult<List<ProductGetDTO>>> GetRelated(int id)
+    {
+        try
+        {
+            var related = await productService.GetRelatedAsync(id);
+            return Ok(related);
+        }
+        catch (Exception ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
     [HttpPost]
     [Authorize(Roles = "admin")]
     public async Task<ActionResult<ProductGetDTO>> Create([FromBody] ProductCreateDTO dto)

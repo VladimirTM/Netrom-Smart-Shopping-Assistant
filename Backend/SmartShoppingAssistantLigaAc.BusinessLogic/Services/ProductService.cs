@@ -25,6 +25,14 @@ public class ProductService(
         return MapToDTO(product);
     }
 
+    public async Task<List<ProductGetDTO>> GetRelatedAsync(int productId)
+    {
+        // Validates existence — throws KeyNotFoundException if not found
+        await productRepository.GetByIdWithCategoriesAsync(productId);
+        var products = await productRepository.GetRelatedAsync(productId);
+        return products.Select(MapToDTO).ToList();
+    }
+
     public async Task<ProductGetDTO> CreateAsync(ProductCreateDTO dto)
     {
         var categories = new List<Category>();
@@ -39,6 +47,7 @@ public class ProductService(
             Description = dto.Description,
             Price = dto.Price,
             ImageUrl = dto.ImageUrl,
+            StockQuantity = dto.StockQuantity,
             Categories = categories
         };
 
@@ -54,6 +63,7 @@ public class ProductService(
         product.Description = dto.Description;
         product.Price = dto.Price;
         product.ImageUrl = dto.ImageUrl;
+        product.StockQuantity = dto.StockQuantity;
 
         product.Categories.Clear();
         foreach (var categoryId in dto.CategoryIds)
@@ -78,6 +88,7 @@ public class ProductService(
         Description = product.Description,
         ImageUrl = product.ImageUrl,
         Price = product.Price,
+        StockQuantity = product.StockQuantity,
         Categories = product.Categories.Select(c => new CategoryGetDTO
         {
             Id = c.Id,

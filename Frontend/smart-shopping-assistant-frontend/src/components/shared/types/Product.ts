@@ -11,6 +11,7 @@ export interface Product {
   description: string;
   imageUrl: string;
   price: number;
+  stockQuantity: number;
   categories: ProductCategory[];
 }
 
@@ -21,6 +22,7 @@ export function toProduct(dto: ProductModel): Product {
     description: dto.description ?? "",
     imageUrl: dto.imageUrl ?? "",
     price: dto.price,
+    stockQuantity: dto.stockQuantity,
     categories: dto.categories,
   };
 }

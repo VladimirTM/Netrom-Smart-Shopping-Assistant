@@ -1,4 +1,4 @@
-import { Box, Button, Chip, Container, Grid, Paper, Typography } from "@mui/material";
+import { Box, Button, Chip, Container, Grid, Paper, Typography, useTheme } from "@mui/material";
 import { NavLink } from "react-router-dom";
 import CategoryIcon from "@mui/icons-material/Category";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
@@ -53,12 +53,17 @@ const features = [
 ];
 
 function UserHome() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+
   return (
     <Box>
       {/* Hero */}
       <Box
         sx={{
-          background: "linear-gradient(135deg, #5a4a00 0%, #867000 50%, #a08800 100%)",
+          background: isDark
+            ? "linear-gradient(135deg, #3a2e00 0%, #5a4800 50%, #6e5800 100%)"
+            : "linear-gradient(135deg, #5a4a00 0%, #867000 50%, #a08800 100%)",
           color: "#fff",
           py: { xs: 8, md: 12 },
           px: 3,
@@ -95,7 +100,7 @@ function UserHome() {
             color: "primary.dark",
             fontWeight: 700,
             px: 5,
-            "&:hover": { bgcolor: "#f5f0cc" },
+            "&:hover": { bgcolor: isDark ? "rgba(255,255,255,0.85)" : "#f5f0cc" },
           }}
         >
           Start Shopping
@@ -103,7 +108,15 @@ function UserHome() {
       </Box>
 
       <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-        <Box sx={{ bgcolor: "#F9F6E8", borderRadius: 4, p: { xs: 4, md: 6 } }}>
+        <Box
+          sx={{
+            bgcolor: "background.paper",
+            borderRadius: 4,
+            p: { xs: 4, md: 6 },
+            border: "1px solid",
+            borderColor: "divider",
+          }}
+        >
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, textAlign: "center" }}>
             Why Smart Shopping Assistant?
           </Typography>
@@ -123,7 +136,7 @@ function UserHome() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      "& .MuiSvgIcon-root": { color: "#fff", fontSize: 22 },
+                      "& .MuiSvgIcon-root": { color: "#1a1a00", fontSize: 22 },
                     }}
                   >
                     {icon}

@@ -9,6 +9,7 @@ export interface ProductModel {
   description?: string;
   imageUrl?: string;
   price: number;
+  stockQuantity: number;
   categories: ProductCategoryModel[];
 }
 
@@ -17,5 +18,6 @@ export interface ProductInput {
   description?: string;
   price: number;
   imageUrl?: string;
+  stockQuantity: number;
   categoryIds: number[];
 }
