@@ -10,12 +10,20 @@ import NotFound from "./components/NotFound";
 import Shop from "./components/Shop";
 import CartProvider from "./context/CartContent/CartProvider";
 import CartDrawer from "./components/CartDrawer";
-import RoleProvider from "./context/RoleContext/RoleProvider";
-import { useRole } from "./context/RoleContext/role-context";
+import AuthProvider from "./context/AuthContext/AuthProvider";
+import { useAuth } from "./context/AuthContext/auth-context";
+import Login from "./components/Login";
+import Register from "./components/Register";
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { role } = useRole();
-  return role === "admin" ? <>{children}</> : <Navigate to="/" replace />;
+  const { user, isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return user?.role === "admin" ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 function AppRoutes() {
@@ -24,10 +32,33 @@ function AppRoutes() {
       <NavBar />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/shop" element={<Shop />} />
-        <Route path="/categories" element={<AdminRoute><Categories /></AdminRoute>} />
-        <Route path="/products" element={<AdminRoute><Products /></AdminRoute>} />
-        <Route path="/promotions" element={<AdminRoute><Promotions /></AdminRoute>} />
+        <Route
+          path="/categories"
+          element={
+            <AdminRoute>
+              <Categories />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/products"
+          element={
+            <AdminRoute>
+              <Products />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/promotions"
+          element={
+            <AdminRoute>
+              <Promotions />
+            </AdminRoute>
+          }
+        />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <CartDrawer />
@@ -37,11 +68,11 @@ function AppRoutes() {
 
 function App() {
   return (
-    <RoleProvider>
+    <AuthProvider>
       <CartProvider>
         <AppRoutes />
       </CartProvider>
-    </RoleProvider>
+    </AuthProvider>
   );
 }
 

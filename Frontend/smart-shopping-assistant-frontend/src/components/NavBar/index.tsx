@@ -1,20 +1,27 @@
 import {
   AppBar,
+  Avatar,
   Badge,
   Box,
   Button,
-  IconButton,
-  ToggleButton,
-  ToggleButtonGroup,
-  Toolbar,
   Divider,
+  IconButton,
+  ListItemIcon,
+  Menu,
+  MenuItem,
+  Toolbar,
+  Tooltip,
+  Typography,
 } from "@mui/material";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
-import type React from "react";
+import { useState } from "react";
 import { useCart } from "../../context/CartContent/cart-context";
-import { useRole } from "../../context/RoleContext/role-context";
+import { useAuth } from "../../context/AuthContext/auth-context";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import LogoutIcon from "@mui/icons-material/Logout";
+import LoginIcon from "@mui/icons-material/Login";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
 const navButtonSx = {
   color: "rgba(255,255,255,0.75)",
@@ -37,19 +44,18 @@ const navButtonSx = {
 };
 
 function NavBar() {
-  const { role, setRole } = useRole();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const { cart, openCart } = useCart();
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
-  const handleModeChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    value: "user" | "admin",
-  ) => {
-    if (value) {
-      setRole(value);
-      navigate("/");
-    }
-  };
+  function handleLogout() {
+    setMenuAnchor(null);
+    logout();
+    navigate("/login");
+  }
+
+  const isAdmin = user?.role === "admin";
 
   return (
     <AppBar
@@ -71,14 +77,18 @@ function NavBar() {
           />
         </Link>
 
-        <Divider orientation="vertical" flexItem sx={{ borderColor: "rgba(255,255,255,0.15)", my: 1 }} />
+        <Divider
+          orientation="vertical"
+          flexItem
+          sx={{ borderColor: "rgba(255,255,255,0.15)", my: 1 }}
+        />
 
         {/* Nav links */}
         <Box sx={{ display: "flex", flexGrow: 1, gap: 0.5, ml: 1 }}>
           <Button component={NavLink} to="/" end sx={navButtonSx}>
             Home
           </Button>
-          {role === "admin" ? (
+          {isAdmin ? (
             <>
               <Button component={NavLink} to="/categories" sx={navButtonSx}>
                 Categories
@@ -97,50 +107,8 @@ function NavBar() {
           )}
         </Box>
 
-        {/* Role toggle */}
-        <ToggleButtonGroup
-          value={role}
-          exclusive
-          size="small"
-          onChange={handleModeChange}
-          sx={{
-            mr: 1.5,
-            p: "3px",
-            bgcolor: "rgba(0,0,0,0.3)",
-            borderRadius: "10px",
-            border: "1px solid rgba(255,255,255,0.12)",
-            "& .MuiToggleButtonGroup-grouped": {
-              border: "none !important",
-              borderRadius: "7px !important",
-            },
-            "& .MuiToggleButton-root": {
-              color: "rgba(255,255,255,0.45)",
-              px: 2.5,
-              py: 0.6,
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              textTransform: "none",
-              letterSpacing: "0.03em",
-              transition: "background 0.15s, color 0.15s",
-              "&:hover": {
-                bgcolor: "rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.75)",
-              },
-              "&.Mui-selected": {
-                bgcolor: "#fff",
-                color: "#5a4a00",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
-                "&:hover": { bgcolor: "#f5f5f5" },
-              },
-            },
-          }}
-        >
-          <ToggleButton value="user">User</ToggleButton>
-          <ToggleButton value="admin">Admin</ToggleButton>
-        </ToggleButtonGroup>
-
-        {/* Cart */}
-        {role === "user" && (
+        {/* Cart — users only */}
+        {isAuthenticated && !isAdmin && (
           <IconButton
             onClick={openCart}
             sx={{
@@ -149,12 +117,91 @@ function NavBar() {
             }}
           >
             <Badge
-              badgeContent={cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0}
+              badgeContent={
+                cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0
+              }
               color="primary"
             >
               <ShoppingCartIcon />
             </Badge>
           </IconButton>
+        )}
+
+        {/* Auth buttons / avatar */}
+        {isAuthenticated ? (
+          <>
+            <Tooltip title={user?.email ?? ""}>
+              <IconButton
+                onClick={(e) => setMenuAnchor(e.currentTarget)}
+                sx={{ p: 0.5 }}
+              >
+                <Avatar
+                  sx={{
+                    width: 34,
+                    height: 34,
+                    bgcolor: "rgba(255,255,255,0.2)",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    color: "#fff",
+                  }}
+                >
+                  {user?.email?.[0]?.toUpperCase()}
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => setMenuAnchor(null)}
+              transformOrigin={{ horizontal: "right", vertical: "top" }}
+              anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+            >
+              <Box sx={{ px: 2, py: 1 }}>
+                <Typography variant="body2" fontWeight={600}>
+                  {user?.email}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {user?.role}
+                </Typography>
+              </Box>
+              <Divider />
+              <MenuItem onClick={handleLogout}>
+                <ListItemIcon>
+                  <LogoutIcon fontSize="small" />
+                </ListItemIcon>
+                Sign out
+              </MenuItem>
+            </Menu>
+          </>
+        ) : (
+          <Box sx={{ display: "flex", gap: 0.5 }}>
+            <Button
+              component={NavLink}
+              to="/login"
+              startIcon={<LoginIcon />}
+              sx={{ ...navButtonSx, px: 1.5 }}
+            >
+              Sign in
+            </Button>
+            <Button
+              component={NavLink}
+              to="/register"
+              variant="contained"
+              startIcon={<PersonAddIcon />}
+              sx={{
+                textTransform: "none",
+                bgcolor: "rgba(255,255,255,0.15)",
+                color: "#fff",
+                fontWeight: 600,
+                borderRadius: 2,
+                px: 1.5,
+                "&:hover": { bgcolor: "rgba(255,255,255,0.25)" },
+              }}
+            >
+              Register
+            </Button>
+          </Box>
         )}
       </Toolbar>
     </AppBar>

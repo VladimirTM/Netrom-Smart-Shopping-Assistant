@@ -8,7 +8,7 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
-import { useRole } from "../../context/RoleContext/role-context";
+import { useAuth } from "../../context/AuthContext/auth-context";
 
 const adminCards = [
   {
@@ -192,8 +192,8 @@ function AdminHome() {
 }
 
 function Home() {
-  const { role } = useRole();
-  return role === "admin" ? <AdminHome /> : <UserHome />;
+  const { user } = useAuth();
+  return user?.role === "admin" ? <AdminHome /> : <UserHome />;
 }
 
 export default Home;

@@ -2,13 +2,16 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Cart } from "../../components/shared/types/Cart";
 import { cartApi } from "../../api/clients/CartApiClient";
 import { CartContext } from "./cart-context";
+import { useAuth } from "../AuthContext/auth-context";
 
 function CartProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [cart, setCart] = useState<Cart | null>(null);
   const [open, setOpen] = useState(false);
 
   const loadCart = () => {
-    cartApi.getCart().then(setCart);
+    if (!isAuthenticated) return;
+    cartApi.getCart().then(setCart).catch(() => setCart(null));
   };
 
   async function addItem(productId: number, quantity: number) {
@@ -27,8 +30,13 @@ function CartProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    loadCart();
-  }, []);
+    if (isAuthenticated) {
+      loadCart();
+    } else {
+      setCart(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   return (
     <CartContext.Provider
