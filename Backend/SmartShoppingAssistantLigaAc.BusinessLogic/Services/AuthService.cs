@@ -32,7 +32,7 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
     {
-        var user = await userRepository.FindByEmailAsync(request.Email)
+        var user = await userRepository.FindByEmailAsync(request.Email.ToLower().Trim())
             ?? throw new UnauthorizedAccessException("Invalid email or password.");
 
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
@@ -44,7 +44,24 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
     public async Task<UserDto> GetCurrentUserAsync(int userId)
     {
         var user = await userRepository.GetByIdAsync(userId);
-        return new UserDto(user.Id, user.Email, user.Role, user.CreatedAt);
+        return new UserDto(user.Id, user.Email, user.Role, user.CreatedAt, user.DisplayName);
+    }
+
+    public async Task<UserDto> UpdateProfileAsync(int userId, UpdateProfileRequest request)
+    {
+        var user = await userRepository.GetByIdAsync(userId);
+        user.DisplayName = request.DisplayName;
+        await userRepository.UpdateAsync(user);
+        return new UserDto(user.Id, user.Email, user.Role, user.CreatedAt, user.DisplayName);
+    }
+
+    public async Task ChangePasswordAsync(int userId, ChangePasswordRequest request)
+    {
+        var user = await userRepository.GetByIdAsync(userId);
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            throw new UnauthorizedAccessException("Current password is incorrect.");
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await userRepository.UpdateAsync(user);
     }
 
     private string GenerateToken(User user)
