@@ -19,4 +19,11 @@ public class PromotionRepository(SmartShoppingAssistantDbContext context)
                          (p.CategoryId.HasValue && categoryIds.Contains(p.CategoryId.Value))))
             .ToListAsync();
     }
+
+    public async Task<List<Promotion>> GetActiveAsync()
+    {
+        return await GetAllAsQueryable()
+            .Where(p => p.IsActive)
+            .ToListAsync();
+    }
 }

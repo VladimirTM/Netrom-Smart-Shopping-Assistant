@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Agents;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
@@ -13,7 +14,7 @@ namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
 public class CartItemService(
     ICartItemRepository cartItemRepository,
-    IRepository<Promotion> promotionRepository,
+    IPromotionRepository promotionRepository,
     IRepository<Category> categoryRepository,
     IPromotionCheckerAgent promotionCheckerAgent,
     ISuggestionComposerAgent suggestionComposerAgent) : ICartItemService
@@ -21,7 +22,7 @@ public class CartItemService(
     public async Task<CartGetDTO> GetAllAsync(int userId)
     {
         var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync(userId);
-        var promotions = (await promotionRepository.GetAllAsync()).Where(p => p.IsActive).ToList();
+        var promotions = await promotionRepository.GetActiveAsync();
 
         var subtotal = cartItems.Sum(i => i.Product.Price * i.Quantity);
 
@@ -43,16 +44,18 @@ public class CartItemService(
         };
     }
 
-    public async Task<CartItemGetDTO> GetByIdAsync(int id)
+    public async Task<CartItemGetDTO> GetByIdAsync(int id, int userId)
     {
         var cartItem = await cartItemRepository.GetByIdWithProductAsync(id);
+        if (cartItem.UserId != userId)
+            throw new UnauthorizedAccessException("You do not have access to this cart item.");
         return MapToDTO(cartItem);
     }
 
     public async Task<CartGetDTO> CreateAsync(CartItemCreateDTO dto, int userId)
     {
-        var existing = cartItemRepository.GetAllAsQueryable()
-            .FirstOrDefault(i => i.ProductId == dto.ProductId && i.UserId == userId);
+        var existing = await cartItemRepository.GetAllAsQueryable()
+            .FirstOrDefaultAsync(i => i.ProductId == dto.ProductId && i.UserId == userId);
 
         if (existing is not null)
         {
@@ -72,20 +75,21 @@ public class CartItemService(
         return await GetAllAsync(userId);
     }
 
-    public async Task<CartGetDTO> UpdateAsync(int id, CartItemUpdateDTO dto)
+    public async Task<CartGetDTO> UpdateAsync(int id, CartItemUpdateDTO dto, int userId)
     {
         var cartItem = await cartItemRepository.GetByIdAsync(id);
+        if (cartItem.UserId != userId)
+            throw new UnauthorizedAccessException("You do not have access to this cart item.");
         cartItem.Quantity = dto.Quantity;
         await cartItemRepository.UpdateAsync(cartItem);
-
-        var userId = cartItem.UserId ?? 0;
         return await GetAllAsync(userId);
     }
 
-    public async Task<CartGetDTO> DeleteAsync(int id)
+    public async Task<CartGetDTO> DeleteAsync(int id, int userId)
     {
         var cartItem = await cartItemRepository.GetByIdAsync(id);
-        var userId = cartItem.UserId ?? 0;
+        if (cartItem.UserId != userId)
+            throw new UnauthorizedAccessException("You do not have access to this cart item.");
         await cartItemRepository.DeleteAsync(id);
         return await GetAllAsync(userId);
     }
@@ -220,6 +224,7 @@ public class CartItemService(
         ProductName = cartItem.Product.Name,
         Price = cartItem.Product.Price,
         Quantity = cartItem.Quantity,
-        Subtotal = cartItem.Product.Price * cartItem.Quantity
+        Subtotal = cartItem.Product.Price * cartItem.Quantity,
+        StockQuantity = cartItem.Product.StockQuantity
     };
 }

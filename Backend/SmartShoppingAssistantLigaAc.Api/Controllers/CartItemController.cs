@@ -11,24 +11,30 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 [Authorize]
 public class CartItemController(ICartItemService cartItemService) : ControllerBase
 {
-    private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private int? UserId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     [HttpGet]
     public async Task<ActionResult<CartGetDTO>> GetAll()
     {
-        var cart = await cartItemService.GetAllAsync(UserId);
+        if (UserId is not { } userId) return Unauthorized();
+        var cart = await cartItemService.GetAllAsync(userId);
         return Ok(cart);
     }
 
     [HttpGet("items/{id}")]
     public async Task<ActionResult<CartItemGetDTO>> GetById(int id)
     {
+        if (UserId is not { } userId) return Unauthorized();
         try
         {
-            var cartItem = await cartItemService.GetByIdAsync(id);
+            var cartItem = await cartItemService.GetByIdAsync(id, userId);
             return Ok(cartItem);
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
@@ -37,19 +43,25 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     [HttpPost("items")]
     public async Task<ActionResult<CartGetDTO>> Create([FromBody] CartItemCreateDTO dto)
     {
-        var cart = await cartItemService.CreateAsync(dto, UserId);
+        if (UserId is not { } userId) return Unauthorized();
+        var cart = await cartItemService.CreateAsync(dto, userId);
         return Ok(cart);
     }
 
     [HttpPut("items/{id}")]
     public async Task<ActionResult<CartGetDTO>> Update(int id, [FromBody] CartItemUpdateDTO dto)
     {
+        if (UserId is not { } userId) return Unauthorized();
         try
         {
-            var cart = await cartItemService.UpdateAsync(id, dto);
+            var cart = await cartItemService.UpdateAsync(id, dto, userId);
             return Ok(cart);
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
@@ -58,12 +70,17 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     [HttpDelete("items/{id}")]
     public async Task<ActionResult<CartGetDTO>> Delete(int id)
     {
+        if (UserId is not { } userId) return Unauthorized();
         try
         {
-            var cart = await cartItemService.DeleteAsync(id);
+            var cart = await cartItemService.DeleteAsync(id, userId);
             return Ok(cart);
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
@@ -72,14 +89,16 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     [HttpDelete]
     public async Task<IActionResult> DeleteAll()
     {
-        await cartItemService.DeleteAllAsync(UserId);
+        if (UserId is not { } userId) return Unauthorized();
+        await cartItemService.DeleteAllAsync(userId);
         return NoContent();
     }
 
     [HttpPost("analyze")]
     public async Task<IActionResult> AnalyzeCart()
     {
-        var analysisResponse = await cartItemService.AnalyzeCartAsync(UserId);
+        if (UserId is not { } userId) return Unauthorized();
+        var analysisResponse = await cartItemService.AnalyzeCartAsync(userId);
         return Ok(analysisResponse);
     }
 }

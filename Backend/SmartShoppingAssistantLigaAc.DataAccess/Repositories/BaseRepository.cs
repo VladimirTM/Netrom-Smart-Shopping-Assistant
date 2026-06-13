@@ -54,8 +54,6 @@ public class BaseRepository<TEntity>(SmartShoppingAssistantDbContext context) : 
 
     public async Task DeleteAllAsync()
     {
-        var entities = await Context.Set<TEntity>().ToListAsync();
-        Context.Set<TEntity>().RemoveRange(entities);
-        await Context.SaveChangesAsync();
+        await Context.Set<TEntity>().ExecuteDeleteAsync();
     }
 }

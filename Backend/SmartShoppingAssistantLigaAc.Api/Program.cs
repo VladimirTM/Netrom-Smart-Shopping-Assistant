@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services;
@@ -9,6 +10,7 @@ using SmartShoppingAssistantLigaAc.DataAccess.Entities;
 using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 using SmartShoppingAssistantLigaAc.DataAccess.Seeders;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Agents;
@@ -44,10 +46,29 @@ builder.Services.AddScoped<IPromotionService, PromotionService>();
 builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
 builder.Services.AddScoped<ICartItemService, CartItemService>();
 
+// Banners
+builder.Services.AddScoped<IRepository<Banner>, BaseRepository<Banner>>();
+builder.Services.AddScoped<IBannerService, BannerService>();
+
+// Analytics
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+
+// Activity Log
+builder.Services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
+
+// Orders — depends on ICartItemService and IProductRepository (both already registered above)
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+// AI Search
+builder.Services.AddScoped<IAiSearchService, AiSearchService>();
+
 // Seeders
 builder.Services.AddScoped<CategorySeeder>();
 builder.Services.AddScoped<ProductSeeder>();
 builder.Services.AddScoped<PromotionSeeder>();
+builder.Services.AddScoped<BannerSeeder>();
 builder.Services.AddScoped<UserSeeder>();
 builder.Services.AddScoped<DatabaseSeeder>();
 
@@ -88,15 +109,38 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:5173"];
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAnyOrigin",
+    options.AddPolicy("FrontendPolicy",
         corsPolicyBuilder =>
         {
-            corsPolicyBuilder.AllowAnyOrigin()
-                .AllowAnyMethod()
-                .AllowAnyHeader();
+            if (builder.Environment.IsDevelopment())
+            {
+                corsPolicyBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+            }
+            else
+            {
+                corsPolicyBuilder
+                    .WithOrigins(allowedOrigins)
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
+            }
         });
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("auth", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 10;
+        limiterOptions.Window = TimeSpan.FromMinutes(1);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
 var app = builder.Build();
@@ -117,9 +161,11 @@ using (var scope = app.Services.CreateScope())
     await seeder.SeedAsync();
 }
 
-app.UseCors("AllowAnyOrigin");
+app.UseCors("FrontendPolicy");
 
 app.UseHttpsRedirection();
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
