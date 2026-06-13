@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
@@ -7,7 +8,7 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 
 [Route("api/promotions")]
 [ApiController]
-public class PromotionController(IPromotionService promotionService) : ControllerBase
+public class PromotionController(IPromotionService promotionService, IActivityLogService activityLogService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<PromotionGetDTO>>> GetAll([FromQuery] bool activeOnly = false)
@@ -24,9 +25,13 @@ public class PromotionController(IPromotionService promotionService) : Controlle
             var promotion = await promotionService.GetByIdAsync(id);
             return Ok(promotion);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -35,6 +40,7 @@ public class PromotionController(IPromotionService promotionService) : Controlle
     public async Task<ActionResult<PromotionGetDTO>> Create([FromBody] PromotionCreateDTO dto)
     {
         var created = await promotionService.CreateAsync(dto);
+        await activityLogService.LogAsync("PromotionCreated", "Promotion", created.Id, created.Name, ActorId(), ActorEmail());
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
@@ -45,11 +51,16 @@ public class PromotionController(IPromotionService promotionService) : Controlle
         try
         {
             var updated = await promotionService.UpdateAsync(id, dto);
+            await activityLogService.LogAsync("PromotionUpdated", "Promotion", updated.Id, updated.Name, ActorId(), ActorEmail());
             return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
         }
         catch (Exception ex)
         {
-            return NotFound(ex.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -59,12 +70,26 @@ public class PromotionController(IPromotionService promotionService) : Controlle
     {
         try
         {
+            var promotion = await promotionService.GetByIdAsync(id);
             await promotionService.DeleteAsync(id);
+            await activityLogService.LogAsync("PromotionDeleted", "Promotion", id, promotion.Name, ActorId(), ActorEmail());
             return NoContent();
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+        }
     }
+
+    private int? ActorId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return int.TryParse(claim, out var id) ? id : null;
+    }
+
+    private string? ActorEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
 }

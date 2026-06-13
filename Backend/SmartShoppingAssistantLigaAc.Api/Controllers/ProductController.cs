@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
@@ -7,7 +8,7 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 
 [Route("api/products")]
 [ApiController]
-public class ProductController(IProductService productService) : ControllerBase
+public class ProductController(IProductService productService, IActivityLogService activityLogService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<ProductGetDTO>>> GetAll([FromQuery] int? categoryId = null)
@@ -24,9 +25,13 @@ public class ProductController(IProductService productService) : ControllerBase
             var product = await productService.GetByIdAsync(id);
             return Ok(product);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -38,9 +43,13 @@ public class ProductController(IProductService productService) : ControllerBase
             var related = await productService.GetRelatedAsync(id);
             return Ok(related);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -51,11 +60,16 @@ public class ProductController(IProductService productService) : ControllerBase
         try
         {
             var created = await productService.CreateAsync(dto);
+            await activityLogService.LogAsync("ProductCreated", "Product", created.Id, created.Name, ActorId(), ActorEmail());
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
         }
         catch (Exception ex)
         {
-            return NotFound(ex.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -66,11 +80,16 @@ public class ProductController(IProductService productService) : ControllerBase
         try
         {
             var updated = await productService.UpdateAsync(id, dto);
+            await activityLogService.LogAsync("ProductUpdated", "Product", updated.Id, updated.Name, ActorId(), ActorEmail());
             return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
         }
         catch (Exception ex)
         {
-            return NotFound(ex.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -80,12 +99,26 @@ public class ProductController(IProductService productService) : ControllerBase
     {
         try
         {
+            var product = await productService.GetByIdAsync(id);
             await productService.DeleteAsync(id);
+            await activityLogService.LogAsync("ProductDeleted", "Product", id, product.Name, ActorId(), ActorEmail());
             return NoContent();
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+        }
     }
+
+    private int? ActorId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return int.TryParse(claim, out var id) ? id : null;
+    }
+
+    private string? ActorEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
 }

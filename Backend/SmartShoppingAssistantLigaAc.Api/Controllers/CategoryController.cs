@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
@@ -7,7 +8,7 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 
 [Route("api/categories")]
 [ApiController]
-public class CategoryController(ICategoryService categoryService) : ControllerBase
+public class CategoryController(ICategoryService categoryService, IActivityLogService activityLogService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<CategoryGetDTO>>> GetAll()
@@ -24,9 +25,13 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
             var category = await categoryService.GetByIdAsync(id);
             return Ok(category);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -35,6 +40,7 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     public async Task<ActionResult<CategoryGetDTO>> Create([FromBody] CategoryCreateDTO dto)
     {
         var created = await categoryService.CreateAsync(dto);
+        await activityLogService.LogAsync("CategoryCreated", "Category", created.Id, created.Name, ActorId(), ActorEmail());
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
@@ -45,11 +51,16 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
         try
         {
             var updated = await categoryService.UpdateAsync(id, dto);
+            await activityLogService.LogAsync("CategoryUpdated", "Category", updated.Id, updated.Name, ActorId(), ActorEmail());
             return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
         }
         catch (Exception ex)
         {
-            return NotFound(ex.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -59,12 +70,26 @@ public class CategoryController(ICategoryService categoryService) : ControllerBa
     {
         try
         {
+            var category = await categoryService.GetByIdAsync(id);
             await categoryService.DeleteAsync(id);
+            await activityLogService.LogAsync("CategoryDeleted", "Category", id, category.Name, ActorId(), ActorEmail());
             return NoContent();
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+        }
     }
+
+    private int? ActorId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return int.TryParse(claim, out var id) ? id : null;
+    }
+
+    private string? ActorEmail() => User.FindFirst(ClaimTypes.Email)?.Value;
 }
