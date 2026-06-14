@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -27,10 +28,10 @@ interface AnalyzeDialogProps {
 }
 
 const loadingMessages = [
-  "🤖 Reading your cart...",
-  "🔍 Checking promotions...",
-  "✨ Finding the best deals...",
-  "🛒 Composing suggestions...",
+  "Reading your cart...",
+  "Checking promotions...",
+  "Finding the best deals...",
+  "Composing suggestions...",
 ];
 
 type Decision = "approved" | "declined";
@@ -40,6 +41,7 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
   const [error, setError] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
+  const [addingId, setAddingId] = useState<number | null>(null);
   const [messageIndex, setMessageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
@@ -67,11 +69,17 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
   }, [loading]);
 
   async function handleApprove(suggestion: Suggestion) {
-    await addItem(suggestion.productId, suggestion.quantity);
-    setDecisions((current) => ({
-      ...current,
-      [suggestion.productId]: "approved",
-    }));
+    if (addingId !== null) return;
+    setAddingId(suggestion.productId);
+    try {
+      await addItem(suggestion.productId, suggestion.quantity);
+      setDecisions((current) => ({
+        ...current,
+        [suggestion.productId]: "approved",
+      }));
+    } finally {
+      setAddingId(null);
+    }
   }
 
   function handleDecline(suggestion: Suggestion) {
@@ -187,8 +195,9 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
                           size="small"
                           variant="contained"
                           color="primary"
-                          startIcon={<CheckIcon />}
+                          startIcon={addingId === suggestion.productId ? <CircularProgress size={14} color="inherit" /> : <CheckIcon />}
                           onClick={() => handleApprove(suggestion)}
+                          disabled={addingId !== null}
                         >
                           Add to Cart
                         </Button>

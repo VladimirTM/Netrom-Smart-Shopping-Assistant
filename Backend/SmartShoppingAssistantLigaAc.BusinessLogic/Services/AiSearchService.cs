@@ -27,8 +27,8 @@ public class AiSearchService(
             User query: "{query}"
 
             Rules:
-            - keywords: extract meaningful product keywords from the query (ignore stop words)
-            - categoryIds: map to matching category IDs from the list above (empty if none match)
+            - categoryIds: map words to matching category IDs from the list above (empty if none match)
+            - keywords: extract product-specific attribute keywords only (color, material, genre, brand, model, use-case, etc.) — do NOT include words that already map to a category above
             - minPrice: minimum price in RON if mentioned, otherwise 0
             - maxPrice: maximum price in RON if mentioned, otherwise 0 (0 = no upper limit)
             """;

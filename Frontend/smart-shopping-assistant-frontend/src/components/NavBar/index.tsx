@@ -25,6 +25,8 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import LogoutIcon from "@mui/icons-material/Logout";
 import LoginIcon from "@mui/icons-material/Login";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import PersonIcon from "@mui/icons-material/Person";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 
@@ -69,7 +71,7 @@ function NavBar() {
       position="sticky"
       elevation={0}
       sx={{
-        backgroundColor: "#6B6400",
+        backgroundColor: "primary.dark",
         borderBottom: "1px solid rgba(255,255,255,0.08)",
       }}
     >
@@ -106,34 +108,40 @@ function NavBar() {
               <Button component={NavLink} to="/promotions" sx={navButtonSx}>
                 Promotions
               </Button>
+              <Button component={NavLink} to="/banners" sx={navButtonSx}>
+                Banners
+              </Button>
+              <Button component={NavLink} to="/analytics" sx={navButtonSx}>
+                Analytics
+              </Button>
+              <Button component={NavLink} to="/manage-orders" sx={navButtonSx}>
+                Orders
+              </Button>
             </>
           ) : (
             <>
               <Button component={NavLink} to="/shop" sx={navButtonSx}>
                 Shop
               </Button>
-              {isAuthenticated && (
-                <Button component={NavLink} to="/wishlist" sx={navButtonSx}>
-                  Wishlist
-                </Button>
-              )}
             </>
           )}
         </Box>
 
         {/* Wishlist icon — users only */}
         {isAuthenticated && !isAdmin && (
-          <IconButton
-            onClick={() => navigate("/wishlist")}
-            sx={{
-              color: "rgba(255,255,255,0.8)",
-              "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
-            }}
-          >
-            <Badge badgeContent={wishlistItems.size} color="error">
-              <FavoriteBorderIcon />
-            </Badge>
-          </IconButton>
+          <Tooltip title="Wishlist">
+            <IconButton
+              onClick={() => navigate("/wishlist")}
+              sx={{
+                color: "rgba(255,255,255,0.8)",
+                "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
+              }}
+            >
+              <Badge badgeContent={wishlistItems.size} color="error">
+                <FavoriteBorderIcon />
+              </Badge>
+            </IconButton>
+          </Tooltip>
         )}
 
         {/* Cart — users only */}
@@ -157,15 +165,17 @@ function NavBar() {
         )}
 
         {/* Dark mode toggle */}
-        <IconButton
-          onClick={toggleMode}
-          sx={{
-            color: "rgba(255,255,255,0.8)",
-            "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
-          }}
-        >
-          {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-        </IconButton>
+        <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+          <IconButton
+            onClick={toggleMode}
+            sx={{
+              color: "rgba(255,255,255,0.8)",
+              "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" },
+            }}
+          >
+            {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+          </IconButton>
+        </Tooltip>
 
         {/* Auth buttons / avatar */}
         {isAuthenticated ? (
@@ -198,13 +208,30 @@ function NavBar() {
               anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
             >
               <Box sx={{ px: 2, py: 1 }}>
-                <Typography variant="body2" fontWeight={600}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {user?.email}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {user?.role}
                 </Typography>
               </Box>
+              <Divider />
+              {!isAdmin && (
+                <MenuItem onClick={() => { setMenuAnchor(null); navigate("/profile"); }}>
+                  <ListItemIcon>
+                    <PersonIcon fontSize="small" />
+                  </ListItemIcon>
+                  Profile
+                </MenuItem>
+              )}
+              {!isAdmin && (
+                <MenuItem onClick={() => { setMenuAnchor(null); navigate("/orders"); }}>
+                  <ListItemIcon>
+                    <ReceiptLongIcon fontSize="small" />
+                  </ListItemIcon>
+                  Order History
+                </MenuItem>
+              )}
               <Divider />
               <MenuItem onClick={handleLogout}>
                 <ListItemIcon>

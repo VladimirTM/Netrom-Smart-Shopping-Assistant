@@ -1,43 +1,37 @@
 import { useState, useCallback, useEffect, type ReactNode } from "react";
 import { WishlistContext } from "./wishlist-context";
 import { useAuth } from "../AuthContext/auth-context";
-
-function storageKey(userId: number | null | undefined): string {
-  return userId != null ? `wishlist_${userId}` : "wishlist_guest";
-}
-
-function loadFromStorage(key: string): Set<number> {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return new Set<number>(JSON.parse(raw));
-  } catch {
-    // ignore
-  }
-  return new Set<number>();
-}
+import { wishlistApi } from "../../api/clients/WishlistApiClient";
 
 function WishlistProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const [items, setItems] = useState<Set<number>>(() => loadFromStorage(storageKey(user?.userId)));
+  const { isAuthenticated } = useAuth();
+  const [items, setItems] = useState<Set<number>>(new Set());
 
-  // Reload wishlist from storage when the user changes (login / logout)
   useEffect(() => {
-    setItems(loadFromStorage(storageKey(user?.userId)));
-  }, [user?.userId]);
+    if (isAuthenticated) {
+      wishlistApi
+        .getWishlist()
+        .then((data) => setItems(new Set(data.productIds)))
+        .catch(() => setItems(new Set()));
+    } else {
+      setItems(new Set());
+    }
+  }, [isAuthenticated]);
 
-  const toggle = useCallback((productId: number) => {
-    const key = storageKey(user?.userId);
-    setItems((prev) => {
-      const next = new Set(prev);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
+  const toggle = useCallback(
+    async (productId: number) => {
+      const inWishlist = items.has(productId);
+      try {
+        const data = inWishlist
+          ? await wishlistApi.removeItem(productId)
+          : await wishlistApi.addItem(productId);
+        setItems(new Set(data.productIds));
+      } catch {
+        // keep existing state on error
       }
-      localStorage.setItem(key, JSON.stringify([...next]));
-      return next;
-    });
-  }, [user?.userId]);
+    },
+    [items]
+  );
 
   const has = useCallback((productId: number) => items.has(productId), [items]);
 

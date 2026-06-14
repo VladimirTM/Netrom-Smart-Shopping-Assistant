@@ -10,23 +10,38 @@ function CartProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
 
   const loadCart = () => {
-    if (!isAuthenticated) return;
-    cartApi.getCart().then(setCart).catch(() => setCart(null));
+    if (!isAuthenticated) return Promise.resolve();
+    return cartApi.getCart().then(setCart).catch(() => setCart(null));
   };
 
   async function addItem(productId: number, quantity: number) {
-    await cartApi.addItem({ productId, quantity });
-    loadCart();
+    try {
+      await cartApi.addItem({ productId, quantity });
+      loadCart();
+    } catch (err) {
+      loadCart();
+      throw err;
+    }
   }
 
-  async function updateQuantity(productId: number, quantity: number) {
-    await cartApi.updateItem(productId, { quantity });
-    loadCart();
+  async function updateQuantity(cartItemId: number, quantity: number) {
+    try {
+      await cartApi.updateItem(cartItemId, { quantity });
+      loadCart();
+    } catch (err) {
+      loadCart();
+      throw err;
+    }
   }
 
-  async function removeProduct(productId: number) {
-    await cartApi.removeItem(productId);
-    loadCart();
+  async function removeProduct(cartItemId: number) {
+    try {
+      await cartApi.removeItem(cartItemId);
+      loadCart();
+    } catch (err) {
+      loadCart();
+      throw err;
+    }
   }
 
   useEffect(() => {
@@ -48,6 +63,7 @@ function CartProvider({ children }: { children: ReactNode }) {
         addItem: addItem,
         updateQuantity: updateQuantity,
         removeProduct: removeProduct,
+        refreshCart: loadCart,
       }}
     >
       {children}

@@ -21,16 +21,21 @@ import { productsApi } from "../../api/clients/ProductApiClient";
 import type { Product } from "../shared/types/Product";
 import { useCart } from "../../context/CartContent/cart-context";
 import { useWishlist } from "../../context/WishlistContext/wishlist-context";
+import { useToast } from "../../context/ToastContext/toast-context";
+import { useAuth } from "../../context/AuthContext/auth-context";
 import { fmt } from "../../utils/currency";
 
 function Wishlist() {
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { items, toggle } = useWishlist();
+  const { showToast } = useToast();
+  const { isAuthenticated } = useAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [addingId, setAddingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (items.size === 0) {
@@ -41,7 +46,7 @@ function Wishlist() {
       .then(setProducts)
       .catch((err) => setError((err as Error).message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [items]);
 
   const visibleProducts = products.filter((p) => items.has(p.id));
 
@@ -90,8 +95,8 @@ function Wishlist() {
               sx={{
                 display: "flex",
                 flexDirection: "column",
-                transition: "box-shadow 0.2s",
-                "&:hover": { boxShadow: 4 },
+                transition: "box-shadow 0.2s, transform 0.2s",
+                "&:hover": { boxShadow: 4, transform: "translateY(-2px)" },
               }}
             >
               <Box sx={{ position: "relative" }}>
@@ -109,7 +114,7 @@ function Wishlist() {
                 />
                 <IconButton
                   size="small"
-                  onClick={() => toggle(product.id)}
+                  onClick={() => { void toggle(product.id); showToast("Removed from wishlist", "info"); }}
                   sx={{
                     position: "absolute",
                     top: 4,
@@ -150,9 +155,19 @@ function Wishlist() {
                   fullWidth
                   variant="contained"
                   size="small"
-                  startIcon={<AddShoppingCartIcon fontSize="small" />}
-                  disabled={product.stockQuantity === 0}
-                  onClick={() => addItem(product.id, 1)}
+                  startIcon={addingId === product.id ? <CircularProgress size={14} color="inherit" /> : <AddShoppingCartIcon fontSize="small" />}
+                  disabled={product.stockQuantity === 0 || addingId === product.id}
+                  onClick={async () => {
+                    if (!isAuthenticated) { navigate("/login"); return; }
+                    if (addingId !== null) return;
+                    setAddingId(product.id);
+                    try {
+                      await addItem(product.id, 1);
+                      showToast(`${product.name} added to cart`);
+                    } finally {
+                      setAddingId(null);
+                    }
+                  }}
                 >
                   {product.stockQuantity === 0 ? "Out of Stock" : "Add to Cart"}
                 </Button>

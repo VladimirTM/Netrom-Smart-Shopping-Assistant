@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 
 interface WishlistContextValue {
   items: Set<number>;
-  toggle: (productId: number) => void;
+  toggle: (productId: number) => Promise<void>;
   has: (productId: number) => boolean;
 }
 

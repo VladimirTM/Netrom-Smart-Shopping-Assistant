@@ -3,8 +3,8 @@ import { Box, Button, Typography } from "@mui/material";
 
 interface PageHeaderProps {
   title: string;
-  actionLabel: string;
-  onAction: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 function PageHeader({ title, actionLabel, onAction }: PageHeaderProps) {
@@ -20,9 +20,11 @@ function PageHeader({ title, actionLabel, onAction }: PageHeaderProps) {
       <Typography variant="h5" sx={{ fontWeight: 600 }}>
         {title}
       </Typography>
-      <Button variant="contained" startIcon={<AddIcon />} onClick={onAction}>
-        {actionLabel}
-      </Button>
+      {actionLabel && onAction && (
+        <Button variant="contained" startIcon={<AddIcon />} onClick={onAction}>
+          {actionLabel}
+        </Button>
+      )}
     </Box>
   );
 }

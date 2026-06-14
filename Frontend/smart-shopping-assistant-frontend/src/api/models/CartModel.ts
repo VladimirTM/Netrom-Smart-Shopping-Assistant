@@ -10,6 +10,7 @@ export interface CartItemModel {
   price: number;
   quantity: number;
   subtotal: number;
+  stockQuantity: number;
 }
 
 export interface CartModel {

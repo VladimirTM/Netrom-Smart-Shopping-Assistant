@@ -18,11 +18,13 @@ import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useCart } from "../../context/CartContent/cart-context";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AnalyzeDialog from "./AnalyzeDialog";
 import { fmt } from "../../utils/currency";
 
 function CartDrawer() {
   const { cart, open, closeCart, updateQuantity, removeProduct } = useCart();
+  const navigate = useNavigate();
 
   const isEmpty = cart === null || cart.items.length === 0;
   const itemCount =
@@ -183,6 +185,7 @@ function CartDrawer() {
                         onClick={() =>
                           updateQuantity(item.id, item.quantity + 1)
                         }
+                        disabled={item.quantity >= item.stockQuantity}
                       >
                         <AddIcon fontSize="small" />
                       </IconButton>
@@ -260,6 +263,7 @@ function CartDrawer() {
                   size="large"
                   startIcon={<ShoppingCartIcon />}
                   sx={{ borderRadius: 2 }}
+                  onClick={() => { closeCart(); navigate("/checkout"); }}
                 >
                   Proceed to Checkout
                 </Button>

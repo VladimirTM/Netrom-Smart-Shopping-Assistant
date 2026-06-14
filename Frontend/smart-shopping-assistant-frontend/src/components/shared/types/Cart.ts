@@ -11,6 +11,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   subtotal: number;
+  stockQuantity: number;
 }
 
 export interface AppliedPromotion {
@@ -34,6 +35,7 @@ export function toCartItem(dto: CartItemModel): CartItem {
     price: dto.price,
     quantity: dto.quantity,
     subtotal: dto.subtotal,
+    stockQuantity: dto.stockQuantity,
   };
 }
 

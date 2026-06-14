@@ -25,6 +25,8 @@ import { productsApi } from "../../api/clients/ProductApiClient";
 import type { Product } from "../shared/types/Product";
 import { useCart } from "../../context/CartContent/cart-context";
 import { useWishlist } from "../../context/WishlistContext/wishlist-context";
+import { useToast } from "../../context/ToastContext/toast-context";
+import { useAuth } from "../../context/AuthContext/auth-context";
 import { fmt } from "../../utils/currency";
 
 function ProductDetail() {
@@ -32,6 +34,8 @@ function ProductDetail() {
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { toggle: toggleWishlist, has: isWishlisted } = useWishlist();
+  const { showToast } = useToast();
+  const { isAuthenticated } = useAuth();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
@@ -79,10 +83,10 @@ function ProductDetail() {
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Button
         startIcon={<ArrowBackIcon />}
-        onClick={() => navigate("/shop")}
+        onClick={() => navigate(-1)}
         sx={{ mb: 2 }}
       >
-        Back to Shop
+        Back
       </Button>
 
       <Box sx={{ display: "flex", gap: 4, flexDirection: { xs: "column", md: "row" } }}>
@@ -106,7 +110,15 @@ function ProductDetail() {
             <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
               {product.name}
             </Typography>
-            <IconButton onClick={() => toggleWishlist(product.id)} sx={{ flexShrink: 0 }}>
+            <IconButton
+              onClick={() => {
+                if (!isAuthenticated) { navigate("/login"); return; }
+                const wasWishlisted = isWishlisted(product.id);
+                void toggleWishlist(product.id);
+                showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+              }}
+              sx={{ flexShrink: 0 }}
+            >
               {isWishlisted(product.id) ? (
                 <FavoriteIcon color="error" />
               ) : (
@@ -185,7 +197,15 @@ function ProductDetail() {
               size="large"
               startIcon={<AddShoppingCartIcon />}
               disabled={outOfStock}
-              onClick={() => addItem(product.id, quantity)}
+              onClick={async () => {
+                if (!isAuthenticated) { navigate("/login"); return; }
+                try {
+                  await addItem(product.id, quantity);
+                  showToast(`${product.name} added to cart`);
+                } catch {
+                  showToast("Failed to add item to cart.", "error");
+                }
+              }}
               sx={{ flexGrow: 1 }}
             >
               {outOfStock ? "Out of Stock" : "Add to Cart"}
@@ -247,9 +267,15 @@ function ProductDetail() {
                     variant="outlined"
                     startIcon={<AddShoppingCartIcon fontSize="small" />}
                     disabled={rel.stockQuantity === 0}
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      addItem(rel.id, 1);
+                      if (!isAuthenticated) { navigate("/login"); return; }
+                      try {
+                        await addItem(rel.id, 1);
+                        showToast(`${rel.name} added to cart`);
+                      } catch {
+                        showToast("Failed to add item to cart.", "error");
+                      }
                     }}
                   >
                     {rel.stockQuantity === 0 ? "Out of Stock" : "Add to Cart"}

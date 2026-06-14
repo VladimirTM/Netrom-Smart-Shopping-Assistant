@@ -1,13 +1,17 @@
 import { useState } from "react";
 import {
+  Alert,
   Box,
   Button,
+  IconButton,
+  InputAdornment,
   Link,
   Paper,
   TextField,
   Typography,
-  Alert,
 } from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { authApi } from "../../api/clients/AuthApiClient";
 import { useAuth } from "../../context/AuthContext/auth-context";
@@ -20,6 +24,7 @@ function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,10 +66,10 @@ function Register() {
         elevation={3}
         sx={{ p: 4, width: "100%", maxWidth: 400, borderRadius: 3 }}
       >
-        <Typography variant="h5" fontWeight={700} mb={0.5}>
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
           Create account
         </Typography>
-        <Typography variant="body2" color="text.secondary" mb={3}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           Join Smart Shopping Assistant
         </Typography>
 
@@ -87,17 +92,33 @@ function Register() {
           />
           <TextField
             label="Password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             fullWidth
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             sx={{ mb: 2 }}
             autoComplete="new-password"
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword((v) => !v)}
+                      edge="end"
+                      size="small"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
           <TextField
             label="Confirm password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             fullWidth
             required
             value={confirmPassword}
@@ -117,7 +138,7 @@ function Register() {
           </Button>
         </Box>
 
-        <Typography variant="body2" textAlign="center" color="text.secondary">
+        <Typography variant="body2" sx={{ textAlign: "center" }} color="text.secondary">
           Already have an account?{" "}
           <Link component={RouterLink} to="/login">
             Sign in

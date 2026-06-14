@@ -19,21 +19,29 @@ import {
   Select,
   Slider,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
+import FilterListOffIcon from "@mui/icons-material/FilterListOff";
 import AddShoppingCartIcon from "@mui/icons-material/AddShoppingCart";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import LocalOfferIcon from "@mui/icons-material/LocalOffer";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useToast } from "../../context/ToastContext/toast-context";
 import { productsApi } from "../../api/clients/ProductApiClient";
 import { promotionsApi } from "../../api/clients/PromotionApiClient";
 import { categoriesApi } from "../../api/clients/CategoryApiClient";
+import { aiApi } from "../../api/clients/AiApiClient";
 import type { Product } from "../shared/types/Product";
 import type { Category } from "../shared/types/Category";
 import { useCart } from "../../context/CartContent/cart-context";
 import { useWishlist } from "../../context/WishlistContext/wishlist-context";
+import { useAuth } from "../../context/AuthContext/auth-context";
 import { fmt } from "../../utils/currency";
 
 type SortOption = "price-asc" | "price-desc" | "name-asc" | "name-desc";
@@ -52,26 +60,24 @@ function Shop() {
   const [onPromotionOnly, setOnPromotionOnly] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
 
+  const [aiMode, setAiMode] = useState(false);
+  const [aiResults, setAiResults] = useState<Product[] | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const [addingId, setAddingId] = useState<number | null>(null);
+
   const { addItem } = useCart();
   const { toggle: toggleWishlist, has: isWishlisted } = useWishlist();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    const categoryParam = searchParams.get("category");
-
     Promise.all([productsApi.getAll(), categoriesApi.getAll()])
       .then(([prods, cats]) => {
         setProducts(prods);
         setCategories(cats);
-
-        // Pre-select category from URL param (e.g. navigated from ProductDetail chip)
-        if (categoryParam) {
-          const catId = parseInt(categoryParam, 10);
-          if (!isNaN(catId) && cats.some((c) => c.id === catId)) {
-            setSelectedCategories([catId]);
-          }
-        }
 
         if (prods.length > 0) {
           const prices = prods.map((p) => p.price);
@@ -99,7 +105,32 @@ function Shop() {
       })
       .catch((err) => setError((err as Error).message))
       .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-apply category from URL param when categories are loaded or URL changes
+  useEffect(() => {
+    const categoryParam = searchParams.get("category");
+    if (!categoryParam || categories.length === 0) return;
+    const catId = parseInt(categoryParam, 10);
+    if (!isNaN(catId) && categories.some((c) => c.id === catId)) {
+      setSelectedCategories([catId]);
+    }
+  }, [searchParams, categories]);
+
+  useEffect(() => {
+    if (!aiMode || !search.trim()) {
+      setAiResults(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setAiLoading(true);
+      aiApi.semanticSearch(search)
+        .then(setAiResults)
+        .catch(() => setAiResults(null))
+        .finally(() => setAiLoading(false));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search, aiMode]);
 
   const priceMin = products.length
     ? Math.floor(Math.min(...products.map((p) => p.price)))
@@ -129,10 +160,17 @@ function Shop() {
   }
 
   const visibleProducts = useMemo(() => {
-    let filtered = products.filter((p) => {
-      const matchesSearch = p.name
-        .toLowerCase()
-        .includes(search.trim().toLowerCase());
+    // In AI mode use the AI-ranked results as the base; otherwise use all products.
+    // The text search filter is skipped in AI mode because the AI already handled it.
+    const base = aiMode && aiResults !== null ? aiResults : products;
+
+    let filtered = base.filter((p) => {
+      const q = search.trim().toLowerCase();
+      const matchesSearch =
+        aiMode || !q
+          ? true
+          : p.name.toLowerCase().includes(q) ||
+            (p.description ?? "").toLowerCase().includes(q);
       const matchesCategory =
         selectedCategories.length === 0 ||
         p.categories.some((c) => selectedCategories.includes(c.id));
@@ -150,7 +188,9 @@ function Shop() {
     });
 
     return filtered;
-  }, [products, search, selectedCategories, priceRange, sort, onPromotionOnly, inStockOnly, promotedProductIds]);
+  }, [products, aiResults, aiMode, search, selectedCategories, priceRange, sort, onPromotionOnly, inStockOnly, promotedProductIds]);
+
+  const displayedProducts = visibleProducts;
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -175,7 +215,12 @@ function Shop() {
           </Typography>
           {!loading && (
             <Typography variant="body2" color="text.secondary">
-              {visibleProducts.length} product{visibleProducts.length !== 1 ? "s" : ""}
+              {displayedProducts.length} product{displayedProducts.length !== 1 ? "s" : ""}
+              {aiMode && aiResults !== null && (
+                <Typography component="span" variant="body2" color="primary" sx={{ ml: 0.5 }}>
+                  (AI)
+                </Typography>
+              )}
             </Typography>
           )}
         </Box>
@@ -197,24 +242,55 @@ function Shop() {
         </Box>
       </Box>
 
-      {/* Search */}
-      <TextField
-        placeholder="Search products"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        fullWidth
-        size="small"
-        sx={{ mb: 3 }}
-        slotProps={{
-          input: {
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon color="action" fontSize="small" />
-              </InputAdornment>
-            ),
-          },
-        }}
-      />
+      {/* Search + AI toggle */}
+      <Box sx={{ display: "flex", gap: 1, mb: 3, alignItems: "center" }}>
+        <TextField
+          placeholder={aiMode ? "Describe what you're looking for…" : "Search products by name or description"}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          fullWidth
+          size="small"
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  {aiLoading ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <SearchIcon color="action" fontSize="small" />
+                  )}
+                </InputAdornment>
+              ),
+              endAdornment: search ? (
+                <InputAdornment position="end">
+                  <Tooltip title="Clear search">
+                    <IconButton size="small" onClick={() => setSearch("")} edge="end">
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </InputAdornment>
+              ) : null,
+            },
+          }}
+        />
+        <Tooltip title={aiMode ? "Switch to keyword search" : "Switch to AI semantic search"}>
+          <IconButton
+            onClick={() => { setAiMode((m) => !m); setAiResults(null); }}
+            sx={{
+              border: "1px solid",
+              borderColor: aiMode ? "primary.main" : "divider",
+              borderRadius: 1,
+              bgcolor: aiMode ? "primary.main" : "transparent",
+              color: aiMode ? "primary.contrastText" : "text.secondary",
+              "&:hover": {
+                bgcolor: aiMode ? "primary.dark" : "action.hover",
+              },
+            }}
+          >
+            <AutoAwesomeIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
 
       <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
         {/* Sidebar */}
@@ -360,7 +436,7 @@ function Shop() {
               gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
             }}
           >
-            {visibleProducts.map((product) => (
+            {displayedProducts.map((product) => (
               <Card
                 key={product.id}
                 sx={{
@@ -383,25 +459,49 @@ function Shop() {
                       img.src = `https://placehold.co/400x150/eeeeee/999999?text=${encodeURIComponent(product.name)}`;
                     }}
                   />
-                  <IconButton
-                    size="small"
-                    onClick={() => toggleWishlist(product.id)}
-                    sx={{
-                      position: "absolute",
-                      top: 4,
-                      right: 4,
-                      bgcolor: "background.paper",
-                      "&:hover": { bgcolor: "background.paper" },
-                      boxShadow: 1,
-                      p: 0.5,
-                    }}
-                  >
-                    {isWishlisted(product.id) ? (
-                      <FavoriteIcon fontSize="small" color="error" />
-                    ) : (
-                      <FavoriteBorderIcon fontSize="small" />
-                    )}
-                  </IconButton>
+                  {promotedProductIds.has(product.id) && (
+                    <Chip
+                      icon={<LocalOfferIcon sx={{ fontSize: "0.75rem !important" }} />}
+                      label="Sale"
+                      size="small"
+                      color="secondary"
+                      sx={{
+                        position: "absolute",
+                        top: 6,
+                        left: 6,
+                        height: 20,
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        "& .MuiChip-icon": { ml: 0.5 },
+                      }}
+                    />
+                  )}
+                  <Tooltip title={isWishlisted(product.id) ? "Remove from wishlist" : "Save to wishlist"}>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        if (!isAuthenticated) { navigate("/login"); return; }
+                        const wasWishlisted = isWishlisted(product.id);
+                        void toggleWishlist(product.id);
+                        showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+                      }}
+                      sx={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        bgcolor: "background.paper",
+                        "&:hover": { bgcolor: "background.paper" },
+                        boxShadow: 1,
+                        p: 0.5,
+                      }}
+                    >
+                      {isWishlisted(product.id) ? (
+                        <FavoriteIcon fontSize="small" color="error" />
+                      ) : (
+                        <FavoriteBorderIcon fontSize="small" />
+                      )}
+                    </IconButton>
+                  </Tooltip>
                 </Box>
                 <CardContent sx={{ flexGrow: 1, pb: 1 }}>
                   <Typography
@@ -447,22 +547,43 @@ function Shop() {
                     fullWidth
                     variant="contained"
                     size="small"
-                    startIcon={<AddShoppingCartIcon fontSize="small" />}
-                    onClick={() => addItem(product.id, 1)}
-                    disabled={product.stockQuantity === 0}
+                    startIcon={addingId === product.id ? <CircularProgress size={14} color="inherit" /> : <AddShoppingCartIcon fontSize="small" />}
+                    onClick={async () => {
+                      if (!isAuthenticated) { navigate("/login"); return; }
+                      if (addingId !== null) return;
+                      setAddingId(product.id);
+                      try {
+                        await addItem(product.id, 1);
+                        showToast(`${product.name} added to cart`);
+                      } finally {
+                        setAddingId(null);
+                      }
+                    }}
+                    disabled={product.stockQuantity === 0 || addingId === product.id}
                   >
                     {product.stockQuantity === 0 ? "Out of Stock" : "Add to Cart"}
                   </Button>
                 </CardActions>
               </Card>
             ))}
-            {visibleProducts.length === 0 && (
-              <Typography
-                color="text.secondary"
-                sx={{ gridColumn: "1/-1", textAlign: "center", mt: 4 }}
-              >
-                No products match your filters.
-              </Typography>
+            {displayedProducts.length === 0 && !aiLoading && (
+              <Box sx={{ gridColumn: "1/-1", textAlign: "center", mt: 6, color: "text.secondary" }}>
+                <FilterListOffIcon sx={{ fontSize: 48, opacity: 0.3, mb: 1 }} />
+                <Typography variant="h6" color="text.secondary">No products found</Typography>
+                <Typography variant="body2" color="text.disabled" sx={{ mb: 2 }}>
+                  {search ? `No results for "${search}".` : "Try adjusting your filters."}
+                </Typography>
+                {(isFiltered || search) && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<ClearIcon />}
+                    onClick={() => { clearFilters(); setSearch(""); }}
+                  >
+                    Clear all filters
+                  </Button>
+                )}
+              </Box>
             )}
           </Box>
         )}

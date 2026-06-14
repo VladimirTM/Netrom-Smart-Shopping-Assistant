@@ -7,8 +7,9 @@ export interface CartContextValue {
   openCart: () => void;
   closeCart: () => void;
   addItem: (productId: number, quantity: number) => Promise<void>;
-  updateQuantity: (productId: number, quantity: number) => Promise<void>;
-  removeProduct: (productId: number) => Promise<void>;
+  updateQuantity: (cartItemId: number, quantity: number) => Promise<void>;
+  removeProduct: (cartItemId: number) => Promise<void>;
+  refreshCart: () => Promise<void> | void;
 }
 
 export const CartContext = createContext<CartContextValue | null>(null);
