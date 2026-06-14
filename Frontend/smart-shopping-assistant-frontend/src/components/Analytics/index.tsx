@@ -101,15 +101,15 @@ function Analytics() {
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 icon={<ShoppingCartIcon />}
-                label="Active Carts"
-                value={summary.totalCarts.toString()}
+                label="Total Orders"
+                value={summary.totalOrders.toString()}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <StatCard
                 icon={<AttachMoneyIcon />}
-                label="Estimated Revenue"
-                value={`${summary.estimatedRevenue.toFixed(2)} RON`}
+                label="Total Revenue"
+                value={`${summary.totalRevenue.toFixed(2)} RON`}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -132,7 +132,7 @@ function Analytics() {
             {/* Top Products table */}
             <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                Top Products by Cart Additions
+                Top Products by Units Sold
               </Typography>
               <TableContainer component={Paper} elevation={2}>
                 <Table size="small">
@@ -140,7 +140,7 @@ function Analytics() {
                     <TableRow sx={{ bgcolor: "action.hover" }}>
                       <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        Cart Additions
+                        Units Sold
                       </TableCell>
                     </TableRow>
                   </TableHead>
@@ -149,7 +149,7 @@ function Analytics() {
                       <TableRow key={p.productId} hover>
                         <TableCell>{p.name}</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 500 }}>
-                          {p.cartAdditions}
+                          {p.unitsSold}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -161,7 +161,7 @@ function Analytics() {
                             color="text.secondary"
                             sx={{ py: 2 }}
                           >
-                            No cart data yet.
+                            No orders yet.
                           </Typography>
                         </TableCell>
                       </TableRow>

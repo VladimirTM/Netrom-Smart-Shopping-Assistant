@@ -1,7 +1,7 @@
 export interface TopProductModel {
   productId: number;
   name: string;
-  cartAdditions: number;
+  unitsSold: number;
 }
 
 export interface PromotionUsageModel {
@@ -11,8 +11,8 @@ export interface PromotionUsageModel {
 }
 
 export interface AnalyticsSummaryModel {
-  totalCarts: number;
-  estimatedRevenue: number;
+  totalOrders: number;
+  totalRevenue: number;
   topProducts: TopProductModel[];
   promotionUsage: PromotionUsageModel[];
 }

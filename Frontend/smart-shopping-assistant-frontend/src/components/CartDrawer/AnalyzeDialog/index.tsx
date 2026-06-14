@@ -34,7 +34,7 @@ const loadingMessages = [
   "Composing suggestions...",
 ];
 
-type Decision = "approved" | "declined";
+type Decision = "approved" | "declined" | "error";
 
 function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
   const [loading, setLoading] = useState(true);
@@ -77,6 +77,11 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
         ...current,
         [suggestion.productId]: "approved",
       }));
+    } catch {
+      setDecisions((current) => ({
+        ...current,
+        [suggestion.productId]: "error",
+      }));
     } finally {
       setAddingId(null);
     }
@@ -92,7 +97,7 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
   const allDecided =
     analysis !== null &&
     analysis.suggestions.length > 0 &&
-    analysis.suggestions.every((s) => decisions[s.productId] !== undefined);
+    analysis.suggestions.every((s) => decisions[s.productId] !== undefined && decisions[s.productId] !== "error");
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
@@ -189,8 +194,8 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
                     </Typography>
                   )}
                   <Box sx={{ mt: 1.5 }}>
-                    {decision === undefined ? (
-                      <Stack direction="row" spacing={1}>
+                    {decision === undefined || decision === "error" ? (
+                      <Stack direction="row" spacing={1} alignItems="center">
                         <Button
                           size="small"
                           variant="contained"
@@ -199,7 +204,7 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
                           onClick={() => handleApprove(suggestion)}
                           disabled={addingId !== null}
                         >
-                          Add to Cart
+                          {decision === "error" ? "Retry" : "Add to Cart"}
                         </Button>
                         <Button
                           size="small"
@@ -207,9 +212,15 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
                           color="error"
                           startIcon={<CloseIcon />}
                           onClick={() => handleDecline(suggestion)}
+                          disabled={addingId !== null}
                         >
                           Decline
                         </Button>
+                        {decision === "error" && (
+                          <Typography variant="caption" color="error.main">
+                            Failed to add
+                          </Typography>
+                        )}
                       </Stack>
                     ) : (
                       <Chip
