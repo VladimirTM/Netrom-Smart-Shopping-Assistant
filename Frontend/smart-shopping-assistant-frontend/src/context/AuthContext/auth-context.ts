@@ -10,6 +10,7 @@ export interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
+  loading: boolean;
   login: (token: string, user: AuthUser) => void;
   logout: () => void;
 }

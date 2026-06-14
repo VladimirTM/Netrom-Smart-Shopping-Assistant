@@ -1,6 +1,12 @@
 import axios from "axios";
 
-const TOKEN_KEY = "auth_token";
+export const TOKEN_KEY = "auth_token";
+
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: () => void) {
+  onUnauthorized = handler;
+}
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -18,6 +24,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.response?.status === 401) {
+      onUnauthorized?.();
+    }
     const data = error.response?.data;
     const message =
       typeof data === "string" && data !== ""
