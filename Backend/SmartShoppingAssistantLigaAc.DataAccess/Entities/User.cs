@@ -11,4 +11,5 @@ public class User
 
     public ICollection<CartItem> CartItems { get; set; } = [];
     public ICollection<Order> Orders { get; set; } = [];
+    public ICollection<WishlistItem> WishlistItems { get; set; } = [];
 }

@@ -46,6 +46,10 @@ builder.Services.AddScoped<IPromotionService, PromotionService>();
 builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
 builder.Services.AddScoped<ICartItemService, CartItemService>();
 
+// Wishlist
+builder.Services.AddScoped<IWishlistRepository, WishlistRepository>();
+builder.Services.AddScoped<IWishlistService, WishlistService>();
+
 // Banners
 builder.Services.AddScoped<IRepository<Banner>, BaseRepository<Banner>>();
 builder.Services.AddScoped<IBannerService, BannerService>();
