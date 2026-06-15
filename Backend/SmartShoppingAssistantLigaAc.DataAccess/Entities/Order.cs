@@ -6,6 +6,7 @@ public class Order
     public int UserId { get; set; }
     public User User { get; set; } = null!;
     public List<OrderItem> Items { get; set; } = [];
+    public List<OrderAppliedPromotion> AppliedPromotions { get; set; } = [];
     public decimal Total { get; set; }
     public string Status { get; set; } = "Pending";
     public DateTime PlacedAt { get; set; } = DateTime.UtcNow;

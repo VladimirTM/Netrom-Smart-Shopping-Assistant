@@ -16,4 +16,5 @@ public class Promotion
 
     public Product? Product { get; set; }
     public Category? Category { get; set; }
+    public List<OrderAppliedPromotion> OrderUsages { get; set; } = [];
 }

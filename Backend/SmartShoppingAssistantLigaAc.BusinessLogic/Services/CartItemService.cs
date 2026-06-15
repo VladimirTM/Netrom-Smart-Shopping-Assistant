@@ -29,7 +29,7 @@ public class CartItemService(
         var appliedPromotions = promotions
             .Select(p => (Promotion: p, Discount: CalculateDiscount(p, cartItems, subtotal)))
             .Where(x => x.Discount > 0)
-            .Select(x => new AppliedPromotionDTO { PromotionName = x.Promotion.Name, Discount = -x.Discount })
+            .Select(x => new AppliedPromotionDTO { PromotionId = x.Promotion.Id, PromotionName = x.Promotion.Name, Discount = -x.Discount })
             .ToList();
 
         var totalDiscount = Math.Max(appliedPromotions.Sum(x => x.Discount), -subtotal);

@@ -43,6 +43,11 @@ public class OrderService(
                 Price = i.Product.Price,
                 Quantity = i.Quantity,
                 Subtotal = i.Product.Price * i.Quantity
+            }).ToList(),
+            AppliedPromotions = cartDto.AppliedPromotions.Select(p => new OrderAppliedPromotion
+            {
+                PromotionId = p.PromotionId,
+                Discount = p.Discount
             }).ToList()
         };
 

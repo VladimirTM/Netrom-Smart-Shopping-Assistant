@@ -16,6 +16,7 @@ public class SmartShoppingAssistantDbContext(DbContextOptions<SmartShoppingAssis
     public DbSet<Order> Orders { get; set; } = null!;
     public DbSet<OrderItem> OrderItems { get; set; } = null!;
     public DbSet<WishlistItem> WishlistItems { get; set; } = null!;
+    public DbSet<OrderAppliedPromotion> OrderAppliedPromotions { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

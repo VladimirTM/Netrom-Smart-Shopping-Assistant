@@ -9,11 +9,15 @@ public class AnalyticsService(SmartShoppingAssistantDbContext context) : IAnalyt
 {
     public async Task<AnalyticsSummaryDTO> GetSummaryAsync()
     {
-        var totalOrders = await context.Orders.CountAsync();
+        var countedOrders = context.Orders
+            .Where(o => o.Status != "Pending" && o.Status != "Cancelled");
 
-        var totalRevenue = await context.Orders.SumAsync(o => (decimal?)o.Total) ?? 0;
+        var totalOrders = await countedOrders.CountAsync();
+
+        var totalRevenue = await countedOrders.SumAsync(o => (decimal?)o.Total) ?? 0;
 
         var topProducts = await context.OrderItems
+            .Where(i => i.Order.Status != "Pending" && i.Order.Status != "Cancelled")
             .GroupBy(i => new { i.ProductId, i.ProductName })
             .Select(g => new TopProductDTO
             {
@@ -25,16 +29,16 @@ public class AnalyticsService(SmartShoppingAssistantDbContext context) : IAnalyt
             .Take(5)
             .ToListAsync();
 
-        var promotions = await context.Promotions
+        var promotionUsage = await context.Promotions
             .Where(p => p.IsActive)
+            .Select(p => new PromotionUsageDTO
+            {
+                PromotionId = p.Id,
+                Name = p.Name,
+                UsageCount = p.OrderUsages.Count(oap =>
+                    oap.Order.Status != "Pending" && oap.Order.Status != "Cancelled")
+            })
             .ToListAsync();
-
-        var promotionUsage = promotions.Select(p => new PromotionUsageDTO
-        {
-            PromotionId = p.Id,
-            Name = p.Name,
-            UsageCount = 0
-        }).ToList();
 
         return new AnalyticsSummaryDTO
         {

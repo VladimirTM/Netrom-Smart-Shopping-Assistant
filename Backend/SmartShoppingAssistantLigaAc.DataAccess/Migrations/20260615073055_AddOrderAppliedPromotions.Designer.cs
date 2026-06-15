@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartShoppingAssistantLigaAc.DataAccess;
@@ -11,9 +12,11 @@ using SmartShoppingAssistantLigaAc.DataAccess;
 namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
 {
     [DbContext(typeof(SmartShoppingAssistantDbContext))]
-    partial class SmartShoppingAssistantDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260615073055_AddOrderAppliedPromotions")]
+    partial class AddOrderAppliedPromotions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

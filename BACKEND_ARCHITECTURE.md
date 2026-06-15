@@ -44,7 +44,7 @@ Contains all database concerns: EF Core entity classes, the `DbContext`, reposit
 
 | Path | Role |
 |------|------|
-| `SmartShoppingAssistantDbContext.cs` | EF Core DbContext — all `DbSet<T>` registrations and Fluent API configuration calls |
+| `SmartShoppingAssistantDbContext.cs` | EF Core DbContext — `DbSet<T>` registrations for `Products`, `Categories`, `Promotions`, `CartItems`, `Users`, `Banners`, `ActivityLogs`, `Orders`, `OrderItems`, `WishlistItems`, `OrderAppliedPromotions`; Fluent API configuration calls |
 | `SmartShoppingAssistantDbContextFactory.cs` | IDesignTimeDbContextFactory used by the `dotnet ef` CLI for migration generation |
 | `Entities/` | One class per domain object |
 | `Configurations/` | Fluent API config extracted from DbContext per entity |
@@ -89,11 +89,12 @@ The entry point. Configures DI, middleware, authentication, and maps controllers
 User ──< CartItem >── Product ──< Category
                          │
                          └──< Promotion ──── Category
+                                  │         └──── Product
                                   │
-                                  └──── Product
-Banner ──── Promotion
+                                  └──< OrderAppliedPromotion >── Order
 
 Order ──< OrderItem (snapshot of Product at purchase time)
+Order ──< OrderAppliedPromotion (promotions applied at checkout)
 User ──< Order
 
 ActivityLog (append-only audit trail)
@@ -170,6 +171,7 @@ public class Order
     public int Id { get; set; }
     public int UserId { get; set; }
     public List<OrderItem> Items { get; set; }
+    public List<OrderAppliedPromotion> AppliedPromotions { get; set; }
     public decimal Total { get; set; }
     public string Status { get; set; }           // Pending | Confirmed | Shipped | Delivered | Cancelled
     public DateTime PlacedAt { get; set; }
@@ -209,6 +211,7 @@ public class Promotion
 
     public Product? Product { get; set; }
     public Category? Category { get; set; }
+    public List<OrderAppliedPromotion> OrderUsages { get; set; }
 }
 ```
 
@@ -266,6 +269,21 @@ public class WishlistItem
 }
 ```
 Configured with a **unique index on `(UserId, ProductId)`** — prevents duplicate entries without application-level locking. Cascade deletes on both FK sides: deleting a user or a product removes their associated wishlist rows. The service's `AddAsync` is idempotent — it checks for an existing row before inserting.
+
+#### OrderAppliedPromotion
+```csharp
+public class OrderAppliedPromotion
+{
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public int PromotionId { get; set; }
+    public decimal Discount { get; set; }   // negative value (the discount amount applied)
+
+    public Order Order { get; set; }
+    public Promotion Promotion { get; set; }
+}
+```
+Join table that records which promotions were applied at checkout and the discount amount. Written by `OrderService.PlaceOrderAsync` using the applied promotions calculated by `CartItemService.GetAllAsync`. Cascade deletes when the parent order is deleted; `Restrict` delete on the promotion side (a promotion cannot be deleted while order history references it). Used by `AnalyticsService` to count real promotion usage.
 
 ---
 
@@ -328,9 +346,9 @@ Each service is registered as `Scoped` (one instance per HTTP request).
 | `ICategoryService` | `CategoryService` | CRUD categories |
 | `IPromotionService` | `PromotionService` | CRUD promotions + `GetApplicablePromotionsAsync(cartItems)` |
 | `ICartItemService` | `CartItemService` | Add/update/remove cart items; `GetAllAsync` builds `CartGetDTO` with applied promotions; `AnalyzeCartAsync` orchestrates AI agents |
-| `IOrderService` | `OrderService` | `PlaceOrderAsync` (clears cart, creates order + items, decrements stock); `GetOrdersAsync`; `GetAllOrdersAsync`; `UpdateOrderStatusAsync` |
+| `IOrderService` | `OrderService` | `PlaceOrderAsync` (clears cart, creates order + items + applied promotions snapshot, decrements stock); `GetOrdersAsync`; `GetAllOrdersAsync`; `UpdateOrderStatusAsync` |
 | `IBannerService` | `BannerService` | CRUD banners |
-| `IAnalyticsService` | `AnalyticsService` | Aggregated summary: total revenue, total orders, top products, promotion usage |
+| `IAnalyticsService` | `AnalyticsService` | Aggregated summary: total revenue and order count (excluding `Pending` and `Cancelled`), top products by units sold (same filter), promotion usage count from `OrderAppliedPromotions` |
 | `IActivityLogService` | `ActivityLogService` | `LogAsync(action, entityType, entityId, entityName, actorId, actorEmail)` |
 | `IWishlistService` | `WishlistService` | `GetAsync` (list product IDs), `AddAsync` (idempotent add), `RemoveAsync` |
 | `IAiSearchService` | `AiSearchService` | Semantic product search using OpenAI embeddings/completions |
