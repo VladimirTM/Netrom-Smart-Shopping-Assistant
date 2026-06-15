@@ -8,7 +8,7 @@ public class PromotionSeeder(SmartShoppingAssistantDbContext context)
 {
     public async Task SeedAsync()
     {
-        if (context.Promotions.Any())
+        if (await context.Promotions.AnyAsync())
             return;
 
         var products = await context.Products.ToDictionaryAsync(p => p.Name);

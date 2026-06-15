@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartShoppingAssistantLigaAc.DataAccess;
@@ -11,9 +12,11 @@ using SmartShoppingAssistantLigaAc.DataAccess;
 namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
 {
     [DbContext(typeof(SmartShoppingAssistantDbContext))]
-    partial class SmartShoppingAssistantDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260615130407_AddIndexesAndOrderConfig")]
+    partial class AddIndexesAndOrderConfig
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -432,6 +435,113 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Products", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Banana",
+                            Price = 3.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Apple",
+                            Price = 5.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Orange",
+                            Price = 4.49m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "Carrot",
+                            Price = 2.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Name = "Tomato",
+                            Price = 6.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Name = "Spinach",
+                            Price = 8.49m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Name = "Milk",
+                            Price = 7.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Name = "Cheese",
+                            Price = 24.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Name = "Yogurt",
+                            Price = 5.49m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Name = "Orange Juice",
+                            Price = 12.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Name = "Still Water",
+                            Price = 3.49m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Name = "Cola",
+                            Price = 8.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Name = "Chips",
+                            Price = 9.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Name = "Chocolate Bar",
+                            Price = 14.99m,
+                            StockQuantity = 100
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Name = "Crackers",
+                            Price = 7.49m,
+                            StockQuantity = 100
+                        });
                 });
 
             modelBuilder.Entity("SmartShoppingAssistantLigaAc.DataAccess.Entities.Promotion", b =>
@@ -476,6 +586,73 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("Promotions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            IsActive = true,
+                            Name = "Banana Bundle Deal",
+                            ProductId = 1,
+                            Reward = 0,
+                            RewardValue = 1,
+                            Threshold = 3m,
+                            Type = 0
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CategoryId = 1,
+                            IsActive = true,
+                            Name = "Fruit Basket Discount",
+                            Reward = 1,
+                            RewardValue = 10,
+                            Threshold = 5m,
+                            Type = 0
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CategoryId = 3,
+                            IsActive = true,
+                            Name = "Dairy Combo Deal",
+                            Reward = 0,
+                            RewardValue = 1,
+                            Threshold = 2m,
+                            Type = 0
+                        },
+                        new
+                        {
+                            Id = 4,
+                            IsActive = true,
+                            Name = "Big Cart Discount",
+                            Reward = 1,
+                            RewardValue = 5,
+                            Threshold = 100m,
+                            Type = 1
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CategoryId = 4,
+                            IsActive = true,
+                            Name = "Beverage Bundle",
+                            Reward = 1,
+                            RewardValue = 15,
+                            Threshold = 3m,
+                            Type = 0
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CategoryId = 5,
+                            IsActive = true,
+                            Name = "Snack Attack",
+                            Reward = 0,
+                            RewardValue = 1,
+                            Threshold = 4m,
+                            Type = 0
+                        });
                 });
 
             modelBuilder.Entity("SmartShoppingAssistantLigaAc.DataAccess.Entities.User", b =>
@@ -569,7 +746,7 @@ namespace SmartShoppingAssistantLigaAc.DataAccess.Migrations
                     b.HasOne("SmartShoppingAssistantLigaAc.DataAccess.Entities.Product", "Product")
                         .WithMany()
                         .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("SmartShoppingAssistantLigaAc.DataAccess.Entities.User", "User")

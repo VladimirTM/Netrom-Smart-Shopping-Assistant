@@ -7,7 +7,7 @@ public class ProductSeeder(SmartShoppingAssistantDbContext context)
 {
     public async Task SeedAsync()
     {
-        if (context.Products.Any())
+        if (await context.Products.AnyAsync())
             return;
 
         var cats = await context.Categories.ToDictionaryAsync(c => c.Name);

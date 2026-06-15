@@ -26,6 +26,15 @@ public class ProductRepository(SmartShoppingAssistantDbContext context) : BaseRe
             .ToListAsync();
     }
 
+    public async Task<List<Product>> GetByIdsAsync(IEnumerable<int> ids)
+    {
+        var idList = ids.ToList();
+        return await Context.Set<Product>()
+            .Include(p => p.Categories)
+            .Where(p => idList.Contains(p.Id))
+            .ToListAsync();
+    }
+
     public async Task<List<Product>> GetRelatedAsync(int productId, int limit = 6)
     {
         var sourceCategoryIds = Context.Set<Product>()

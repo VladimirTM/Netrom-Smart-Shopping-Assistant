@@ -17,5 +17,7 @@ public class ActivityLogConfiguration : IEntityTypeConfiguration<ActivityLog>
         builder.Property(a => a.EntityName).IsRequired().HasMaxLength(300);
         builder.Property(a => a.ActorEmail).HasMaxLength(300);
         builder.Property(a => a.OccurredAt).IsRequired();
+
+        builder.HasIndex(a => a.OccurredAt);
     }
 }
