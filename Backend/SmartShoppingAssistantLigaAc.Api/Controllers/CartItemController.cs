@@ -98,7 +98,14 @@ public class CartItemController(ICartItemService cartItemService) : ControllerBa
     public async Task<IActionResult> AnalyzeCart()
     {
         if (UserId is not { } userId) return Unauthorized();
-        var analysisResponse = await cartItemService.AnalyzeCartAsync(userId);
-        return Ok(analysisResponse);
+        try
+        {
+            var analysisResponse = await cartItemService.AnalyzeCartAsync(userId);
+            return Ok(analysisResponse);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
     }
 }

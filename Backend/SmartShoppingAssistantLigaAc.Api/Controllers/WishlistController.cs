@@ -24,7 +24,14 @@ public class WishlistController(IWishlistService wishlistService) : ControllerBa
     public async Task<ActionResult<WishlistGetDTO>> Add(int productId)
     {
         if (UserId is not { } userId) return Unauthorized();
-        return Ok(await wishlistService.AddAsync(productId, userId));
+        try
+        {
+            return Ok(await wishlistService.AddAsync(productId, userId));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpDelete("{productId}")]

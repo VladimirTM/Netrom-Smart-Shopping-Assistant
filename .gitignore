@@ -19,3 +19,10 @@
 !.env.example
 appsettings.json
 appsettings.Development.json
+
+# Build artifacts
+bin/
+obj/
+dist/
+node_modules/
+*.user

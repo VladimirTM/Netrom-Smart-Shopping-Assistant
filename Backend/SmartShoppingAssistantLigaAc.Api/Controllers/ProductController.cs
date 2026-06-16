@@ -29,10 +29,6 @@ public class ProductController(IProductService productService, IActivityLogServi
         {
             return NotFound(ex.Message);
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
-        }
     }
 
     [HttpGet("{id}/related")]
@@ -47,10 +43,16 @@ public class ProductController(IProductService productService, IActivityLogServi
         {
             return NotFound(ex.Message);
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
-        }
+    }
+
+    [HttpPost("batch")]
+    public async Task<ActionResult<List<ProductGetDTO>>> GetByIds([FromBody] List<int> ids)
+    {
+        if (ids == null || ids.Count == 0)
+            return Ok(new List<ProductGetDTO>());
+
+        var products = await productService.GetByIdsAsync(ids);
+        return Ok(products);
     }
 
     [HttpPost]
@@ -66,10 +68,6 @@ public class ProductController(IProductService productService, IActivityLogServi
         catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 
@@ -87,10 +85,6 @@ public class ProductController(IProductService productService, IActivityLogServi
         {
             return NotFound(ex.Message);
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
-        }
     }
 
     [HttpDelete("{id}")]
@@ -107,10 +101,6 @@ public class ProductController(IProductService productService, IActivityLogServi
         catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 

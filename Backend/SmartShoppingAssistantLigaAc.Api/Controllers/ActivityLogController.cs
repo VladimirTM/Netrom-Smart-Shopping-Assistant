@@ -11,9 +11,12 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 public class ActivityLogController(IActivityLogService activityLogService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ActivityLogGetDTO>>> GetLatest([FromQuery] int limit = 50)
+    public async Task<ActionResult> GetLatest([FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
-        var logs = await activityLogService.GetLatestAsync(limit);
-        return Ok(logs);
+        limit = Math.Min(limit, 1000);
+        offset = Math.Max(offset, 0);
+        var logs = await activityLogService.GetLatestAsync(limit, offset);
+        var total = await activityLogService.GetTotalCountAsync();
+        return Ok(new { logs, total });
     }
 }

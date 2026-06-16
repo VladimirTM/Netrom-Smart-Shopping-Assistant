@@ -46,12 +46,13 @@ builder.Services.AddScoped<IPromotionService, PromotionService>();
 builder.Services.AddScoped<ICartItemRepository, CartItemRepository>();
 builder.Services.AddScoped<ICartItemService, CartItemService>();
 
-// Wishlist
+// Wishlist — IProductRepository already registered above
 builder.Services.AddScoped<IWishlistRepository, WishlistRepository>();
 builder.Services.AddScoped<IWishlistService, WishlistService>();
 
 // Banners
-builder.Services.AddScoped<IRepository<Banner>, BaseRepository<Banner>>();
+builder.Services.AddScoped<IBannerRepository, BannerRepository>();
+builder.Services.AddScoped<IRepository<Banner>, BannerRepository>();
 builder.Services.AddScoped<IBannerService, BannerService>();
 
 // Analytics
@@ -96,6 +97,9 @@ builder.Services.AddScoped<ISuggestionComposerAgent, SuggestionComposerAgent>();
 var jwtKey = builder.Configuration["Jwt:Key"]
              ?? throw new InvalidOperationException("Jwt:Key is not configured.");
 
+if (jwtKey.Length < 32)
+    throw new InvalidOperationException("Jwt:Key must be at least 32 characters (256 bits) for HMAC-SHA256.");
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -123,7 +127,10 @@ builder.Services.AddCors(options =>
         {
             if (builder.Environment.IsDevelopment())
             {
-                corsPolicyBuilder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+                Console.WriteLine("WARNING: Running with open CORS policy (Development mode). Do not deploy without restricting origins.");
+                corsPolicyBuilder.WithOrigins("http://localhost:5173", "http://localhost:5174", "https://localhost:5173")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
             }
             else
             {
@@ -166,6 +173,19 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseCors("FrontendPolicy");
+
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    if (!app.Environment.IsDevelopment())
+    {
+        ctx.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+        ctx.Response.Headers["Content-Security-Policy"] = "default-src 'self'";
+    }
+    await next();
+});
 
 app.UseHttpsRedirection();
 

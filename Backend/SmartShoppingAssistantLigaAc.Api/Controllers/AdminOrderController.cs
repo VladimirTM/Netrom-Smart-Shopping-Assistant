@@ -20,14 +20,14 @@ public class AdminOrderController(IOrderService orderService) : ControllerBase
     [HttpPut("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateOrderStatusRequest request)
     {
-        var allowed = new[] { "Pending", "Confirmed", "Shipped", "Delivered", "Cancelled" };
-        if (!allowed.Contains(request.Status))
-            return BadRequest($"Invalid status. Allowed: {string.Join(", ", allowed)}");
-
         try
         {
             await orderService.UpdateOrderStatusAsync(id, request.Status);
             return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {

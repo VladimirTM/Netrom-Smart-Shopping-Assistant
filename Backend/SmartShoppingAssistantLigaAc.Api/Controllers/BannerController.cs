@@ -25,7 +25,7 @@ public class BannerController(IBannerService bannerService, IActivityLogService 
             var banner = await bannerService.GetByIdAsync(id);
             return Ok(banner);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
@@ -50,7 +50,7 @@ public class BannerController(IBannerService bannerService, IActivityLogService 
             await activityLogService.LogAsync("BannerUpdated", "Banner", updated.Id, updated.Title, ActorId(), ActorEmail());
             return Ok(updated);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
@@ -67,7 +67,7 @@ public class BannerController(IBannerService bannerService, IActivityLogService 
             await activityLogService.LogAsync("BannerDeleted", "Banner", id, banner.Title, ActorId(), ActorEmail());
             return NoContent();
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
         }
