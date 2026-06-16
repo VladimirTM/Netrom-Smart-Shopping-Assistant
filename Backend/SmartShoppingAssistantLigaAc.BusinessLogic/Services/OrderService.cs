@@ -1,5 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
+using SmartShoppingAssistantLigaAc.DataAccess;
 using SmartShoppingAssistantLigaAc.DataAccess.Entities;
 using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 
@@ -9,13 +11,17 @@ public class OrderService(
     IOrderRepository orderRepository,
     ICartItemRepository cartItemRepository,
     ICartItemService cartItemService,
-    IProductRepository productRepository) : IOrderService
+    SmartShoppingAssistantDbContext dbContext) : IOrderService
 {
     public async Task<OrderGetDTO> PlaceOrderAsync(int userId, ShippingAddressDto shippingAddress)
     {
+        // Fetch once for both stock validation and entity-level operations
         var cartItems = await cartItemRepository.GetAllWithProductAndCategoriesAsync(userId);
         if (cartItems.Count == 0)
             throw new InvalidOperationException("Cart is empty.");
+
+        // Get the cart DTO (promotions + total) using the same underlying data
+        var cartDto = await cartItemService.GetAllAsync(userId);
 
         foreach (var item in cartItems)
         {
@@ -24,45 +30,55 @@ public class OrderService(
                     $"Insufficient stock for '{item.Product.Name}'. Available: {item.Product.StockQuantity}, requested: {item.Quantity}.");
         }
 
-        var cartDto = await cartItemService.GetAllAsync(userId);
-
-        var order = new Order
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        try
         {
-            UserId = userId,
-            PlacedAt = DateTime.UtcNow,
-            Status = "Pending",
-            ShippingName = shippingAddress.Name,
-            ShippingAddress = shippingAddress.Address,
-            ShippingCity = shippingAddress.City,
-            ShippingPostalCode = shippingAddress.PostalCode,
-            ShippingPhone = shippingAddress.Phone,
-            Items = cartItems.Select(i => new OrderItem
+            var order = new Order
             {
-                ProductId = i.ProductId,
-                ProductName = i.Product.Name,
-                Price = i.Product.Price,
-                Quantity = i.Quantity,
-                Subtotal = i.Product.Price * i.Quantity
-            }).ToList(),
-            AppliedPromotions = cartDto.AppliedPromotions.Select(p => new OrderAppliedPromotion
-            {
-                PromotionId = p.PromotionId,
-                Discount = p.Discount
-            }).ToList()
-        };
+                UserId = userId,
+                PlacedAt = DateTime.UtcNow,
+                Status = "Pending",
+                ShippingName = shippingAddress.Name,
+                ShippingAddress = shippingAddress.Address,
+                ShippingCity = shippingAddress.City,
+                ShippingPostalCode = shippingAddress.PostalCode,
+                ShippingPhone = shippingAddress.Phone,
+                Total = cartDto.Total,
+                Items = cartItems.Select(i => new OrderItem
+                {
+                    ProductId = i.ProductId,
+                    ProductName = i.Product.Name,
+                    Price = i.Product.Price,
+                    Quantity = i.Quantity,
+                    Subtotal = i.Product.Price * i.Quantity
+                }).ToList(),
+                AppliedPromotions = cartDto.AppliedPromotions.Select(p => new OrderAppliedPromotion
+                {
+                    PromotionId = p.PromotionId,
+                    Discount = p.Discount
+                }).ToList()
+            };
 
-        order.Total = cartDto.Total;
+            // Decrement stock in-memory; EF change tracker will batch with the order insert
+            foreach (var item in cartItems)
+                item.Product.StockQuantity -= item.Quantity;
 
-        foreach (var item in cartItems)
-        {
-            item.Product.StockQuantity -= item.Quantity;
-            await productRepository.UpdateAsync(item.Product);
+            dbContext.Orders.Add(order);
+            await dbContext.SaveChangesAsync(); // atomically saves order + stock decrements
+
+            // Delete cart items inside the same transaction
+            var cartEntities = await dbContext.CartItems.Where(c => c.UserId == userId).ToListAsync();
+            dbContext.CartItems.RemoveRange(cartEntities);
+            await dbContext.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+            return MapToDTO(order);
         }
-
-        await orderRepository.AddAsync(order);
-        await cartItemRepository.DeleteAllForUserAsync(userId);
-
-        return MapToDTO(order);
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<List<OrderGetDTO>> GetOrdersAsync(int userId)
@@ -97,8 +113,12 @@ public class OrderService(
         }).ToList();
     }
 
+    private static readonly string[] AllowedStatuses = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
+
     public async Task UpdateOrderStatusAsync(int id, string status)
     {
+        if (!AllowedStatuses.Contains(status))
+            throw new ArgumentException($"Invalid status. Allowed: {string.Join(", ", AllowedStatuses)}");
         await orderRepository.UpdateStatusAsync(id, status);
     }
 

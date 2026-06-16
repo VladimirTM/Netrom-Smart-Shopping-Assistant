@@ -23,9 +23,9 @@ public class ActivityLogService(IActivityLogRepository activityLogRepository) : 
         await activityLogRepository.AddAsync(entry);
     }
 
-    public async Task<List<ActivityLogGetDTO>> GetLatestAsync(int limit = 50)
+    public async Task<List<ActivityLogGetDTO>> GetLatestAsync(int limit = 50, int offset = 0)
     {
-        var logs = await activityLogRepository.GetLatestAsync(limit);
+        var logs = await activityLogRepository.GetLatestAsync(limit, offset);
         return logs.Select(a => new ActivityLogGetDTO
         {
             Id = a.Id,
@@ -38,4 +38,6 @@ public class ActivityLogService(IActivityLogRepository activityLogRepository) : 
             OccurredAt = a.OccurredAt
         }).ToList();
     }
+
+    public Task<int> GetTotalCountAsync() => activityLogRepository.GetTotalCountAsync();
 }

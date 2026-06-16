@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 using SmartShoppingAssistantLigaAc.DataAccess.Entities;
@@ -25,6 +26,12 @@ public class ProductService(
         return MapToDTO(product);
     }
 
+    public async Task<List<ProductGetDTO>> GetByIdsAsync(IEnumerable<int> ids)
+    {
+        var products = await productRepository.GetByIdsAsync(ids);
+        return products.Select(MapToDTO).ToList();
+    }
+
     public async Task<List<ProductGetDTO>> GetRelatedAsync(int productId)
     {
         // Validates existence — throws KeyNotFoundException if not found
@@ -35,10 +42,14 @@ public class ProductService(
 
     public async Task<ProductGetDTO> CreateAsync(ProductCreateDTO dto)
     {
-        var categories = new List<Category>();
-        foreach (var categoryId in dto.CategoryIds)
+        var categories = await categoryRepository.GetAllAsQueryable()
+            .Where(c => dto.CategoryIds.Contains(c.Id))
+            .ToListAsync();
+
+        if (categories.Count != dto.CategoryIds.Count)
         {
-            categories.Add(await categoryRepository.GetByIdAsync(categoryId));
+            var missing = dto.CategoryIds.Except(categories.Select(c => c.Id)).First();
+            throw new KeyNotFoundException($"Category with id {missing} not found");
         }
 
         var product = new Product
@@ -59,18 +70,22 @@ public class ProductService(
     {
         var product = await productRepository.GetByIdWithCategoriesAsync(id);
 
+        var categories = await categoryRepository.GetAllAsQueryable()
+            .Where(c => dto.CategoryIds.Contains(c.Id))
+            .ToListAsync();
+
+        if (categories.Count != dto.CategoryIds.Count)
+        {
+            var missing = dto.CategoryIds.Except(categories.Select(c => c.Id)).First();
+            throw new KeyNotFoundException($"Category with id {missing} not found");
+        }
+
         product.Name = dto.Name;
         product.Description = dto.Description;
         product.Price = dto.Price;
         product.ImageUrl = dto.ImageUrl;
         product.StockQuantity = dto.StockQuantity;
-
-        product.Categories.Clear();
-        foreach (var categoryId in dto.CategoryIds)
-        {
-            var category = await categoryRepository.GetByIdAsync(categoryId);
-            product.Categories.Add(category);
-        }
+        product.Categories = categories;
 
         var updated = await productRepository.UpdateAsync(product);
         return MapToDTO(updated);

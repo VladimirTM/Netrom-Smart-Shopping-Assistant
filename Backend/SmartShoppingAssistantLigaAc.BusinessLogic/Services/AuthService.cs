@@ -14,13 +14,13 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
 {
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
     {
-        var existing = await userRepository.FindByEmailAsync(request.Email);
+        var existing = await userRepository.FindByEmailAsync(request.Email.Trim().ToLower());
         if (existing is not null)
             throw new InvalidOperationException("A user with this email already exists.");
 
         var user = new User
         {
-            Email = request.Email.ToLower(),
+            Email = request.Email.Trim().ToLower(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
             CreatedAt = DateTime.UtcNow

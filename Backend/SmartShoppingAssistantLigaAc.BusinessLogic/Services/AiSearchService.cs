@@ -37,12 +37,15 @@ public class AiSearchService(
             [new ChatMessage(ChatRole.User, prompt)],
             new ChatOptions { ResponseFormat = ChatResponseFormat.ForJsonSchema<SearchFilters>() });
 
-        SearchFilters? filters = null;
+        SearchFilters? filters;
         try
         {
             filters = JsonSerializer.Deserialize<SearchFilters>(response.Text ?? "{}");
         }
-        catch (JsonException) { }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("AI returned invalid search filters.", ex);
+        }
 
         if (filters is null || (filters.Keywords.Count == 0 && filters.CategoryIds.Count == 0 && filters.MinPrice == 0 && filters.MaxPrice == 0))
             return [];

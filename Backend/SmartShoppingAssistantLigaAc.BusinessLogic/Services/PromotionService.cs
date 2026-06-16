@@ -1,6 +1,7 @@
 using SmartShoppingAssistantLigaAc.BusinessLogic.DTOs;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 using SmartShoppingAssistantLigaAc.DataAccess.Entities;
+using SmartShoppingAssistantLigaAc.DataAccess.Entities.Enums;
 using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
@@ -9,10 +10,9 @@ public class PromotionService(IPromotionRepository promotionRepository) : IPromo
 {
     public async Task<List<PromotionGetDTO>> GetAllAsync(bool activeOnly = false)
     {
-        var promotions = await promotionRepository.GetAllAsync();
-
-        if (activeOnly)
-            promotions = promotions.Where(p => p.IsActive).ToList();
+        var promotions = activeOnly
+            ? await promotionRepository.GetActiveAsync()
+            : await promotionRepository.GetAllAsync();
 
         return promotions.Select(MapToDTO).ToList();
     }
@@ -25,6 +25,8 @@ public class PromotionService(IPromotionRepository promotionRepository) : IPromo
 
     public async Task<PromotionGetDTO> CreateAsync(PromotionCreateDTO dto)
     {
+        ValidatePromotionRules(dto.Type, dto.Threshold, dto.Reward, dto.RewardValue);
+
         var promotion = new Promotion
         {
             Name = dto.Name,
@@ -43,6 +45,8 @@ public class PromotionService(IPromotionRepository promotionRepository) : IPromo
 
     public async Task<PromotionGetDTO> UpdateAsync(int id, PromotionUpdateDTO dto)
     {
+        ValidatePromotionRules(dto.Type, dto.Threshold, dto.Reward, dto.RewardValue);
+
         var promotion = await promotionRepository.GetByIdAsync(id);
 
         promotion.Name = dto.Name;
@@ -56,6 +60,15 @@ public class PromotionService(IPromotionRepository promotionRepository) : IPromo
 
         var updated = await promotionRepository.UpdateAsync(promotion);
         return MapToDTO(updated);
+    }
+
+    private static void ValidatePromotionRules(PromotionType type, decimal threshold, PromotionReward reward, int rewardValue)
+    {
+        if (reward == PromotionReward.PercentDiscount && rewardValue > 100)
+            throw new ArgumentException("PercentDiscount RewardValue cannot exceed 100.");
+
+        if (type == PromotionType.Quantity && threshold != Math.Floor(threshold))
+            throw new ArgumentException("Quantity promotion Threshold must be a whole number.");
     }
 
     public async Task DeleteAsync(int id)

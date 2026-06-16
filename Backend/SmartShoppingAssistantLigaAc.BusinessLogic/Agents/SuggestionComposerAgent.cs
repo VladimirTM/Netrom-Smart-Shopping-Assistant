@@ -1,13 +1,14 @@
 using System.ComponentModel;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Models;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Tools;
 
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.Agents;
 
-public sealed class SuggestionComposerAgent(IChatClient chatClient, IProductService productService) : ISuggestionComposerAgent
+public sealed class SuggestionComposerAgent(IChatClient chatClient, IProductService productService, ILoggerFactory loggerFactory, IServiceProvider services) : ISuggestionComposerAgent
 {
     public ChatClientAgent Build(string cartJson, string categoriesJson)
     {
@@ -58,8 +59,8 @@ public sealed class SuggestionComposerAgent(IChatClient chatClient, IProductServ
                     ]
                 }
             },
-            null!,
-            null!
+            loggerFactory,
+            services
         );
     }
 }

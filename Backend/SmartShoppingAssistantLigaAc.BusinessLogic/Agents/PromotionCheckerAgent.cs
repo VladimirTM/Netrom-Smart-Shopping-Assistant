@@ -1,16 +1,21 @@
 using System.ComponentModel;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Models;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 using SmartShoppingAssistantLigaAc.BusinessLogic.Tools;
 
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.Agents;
 
-public sealed class PromotionCheckerAgent(IChatClient chatClient, IPromotionService promotionService) : IPromotionCheckerAgent
+public sealed class PromotionCheckerAgent(IChatClient chatClient, IPromotionService promotionService, ILoggerFactory loggerFactory, IServiceProvider services, IConfiguration configuration) : IPromotionCheckerAgent
 {
     public ChatClientAgent Build(string cartJson)
     {
+        var quantityDelta = configuration.GetValue<int>("PromotionAgent:QuantityNearMissDelta", 1);
+        var cartTotalPercent = configuration.GetValue<int>("PromotionAgent:CartTotalNearMissPercent", 20);
+
         return new ChatClientAgent(
             chatClient,
             new ChatClientAgentOptions
@@ -29,10 +34,10 @@ public sealed class PromotionCheckerAgent(IChatClient chatClient, IPromotionServ
                                     2. Classify each promotion as ACTIVE or NEAR-MISS:
                                        - Quantity promotions: sum cart quantity for items in the promotion scope (product-specific, category-wide, or cart-wide).
                                          ACTIVE: currentQuantity >= threshold
-                                         NEAR-MISS: currentQuantity < threshold AND (threshold - currentQuantity) <= 1
+                                         NEAR-MISS: currentQuantity < threshold AND (threshold - currentQuantity) <= {quantityDelta}
                                        - CartTotal promotions: sum (price * quantity) for items in the promotion scope.
                                          ACTIVE: currentTotal >= threshold
-                                         NEAR-MISS: currentTotal < threshold AND (threshold - currentTotal) <= (threshold * 0.20)
+                                         NEAR-MISS: currentTotal < threshold AND (threshold - currentTotal) <= (threshold * {cartTotalPercent / 100.0:F2})
 
                                     3. For each ACTIVE deal, populate:
                                        - promotionId: promotion.Id
@@ -68,8 +73,8 @@ public sealed class PromotionCheckerAgent(IChatClient chatClient, IPromotionServ
                     ]
                 }
             },
-            null!,
-            null!
+            loggerFactory,
+            services
         );
     }
 }

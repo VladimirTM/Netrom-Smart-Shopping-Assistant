@@ -5,16 +5,15 @@ using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
-public class BannerService(IRepository<Banner> bannerRepository) : IBannerService
+public class BannerService(IBannerRepository bannerRepository) : IBannerService
 {
     public async Task<List<BannerGetDTO>> GetAllAsync(bool activeOnly = false)
     {
-        var banners = await bannerRepository.GetAllAsync();
+        var banners = activeOnly
+            ? await bannerRepository.GetAllActiveAsync()
+            : (await bannerRepository.GetAllAsync()).OrderBy(b => b.DisplayOrder).ToList();
 
-        if (activeOnly)
-            banners = banners.Where(b => b.IsActive).ToList();
-
-        return banners.OrderBy(b => b.DisplayOrder).Select(MapToDTO).ToList();
+        return banners.Select(MapToDTO).ToList();
     }
 
     public async Task<BannerGetDTO> GetByIdAsync(int id)

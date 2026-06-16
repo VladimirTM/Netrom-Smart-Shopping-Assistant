@@ -5,7 +5,7 @@ using SmartShoppingAssistantLigaAc.DataAccess.Repositories;
 
 namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services;
 
-public class WishlistService(IWishlistRepository wishlistRepository) : IWishlistService
+public class WishlistService(IWishlistRepository wishlistRepository, IProductRepository productRepository) : IWishlistService
 {
     public async Task<WishlistGetDTO> GetAsync(int userId)
     {
@@ -15,6 +15,7 @@ public class WishlistService(IWishlistRepository wishlistRepository) : IWishlist
 
     public async Task<WishlistGetDTO> AddAsync(int productId, int userId)
     {
+        await productRepository.GetByIdAsync(productId);
         var existing = await wishlistRepository.FindByUserAndProductAsync(userId, productId);
         if (existing is null)
             await wishlistRepository.AddAsync(new WishlistItem { ProductId = productId, UserId = userId });

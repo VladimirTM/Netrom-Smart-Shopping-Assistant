@@ -16,6 +16,7 @@ public class CartItemService(
     ICartItemRepository cartItemRepository,
     IPromotionRepository promotionRepository,
     IRepository<Category> categoryRepository,
+    IProductRepository productRepository,
     IPromotionCheckerAgent promotionCheckerAgent,
     ISuggestionComposerAgent suggestionComposerAgent) : ICartItemService
 {
@@ -26,13 +27,20 @@ public class CartItemService(
 
         var subtotal = cartItems.Sum(i => i.Product.Price * i.Quantity);
 
+        // Best-promotion-wins per scope: within the same target (product / category / cart-wide),
+        // only the promotion with the highest discount is applied. Different scopes can combine.
         var appliedPromotions = promotions
             .Select(p => (Promotion: p, Discount: CalculateDiscount(p, cartItems, subtotal)))
             .Where(x => x.Discount > 0)
-            .Select(x => new AppliedPromotionDTO { PromotionId = x.Promotion.Id, PromotionName = x.Promotion.Name, Discount = -x.Discount })
+            .GroupBy(x => x.Promotion.ProductId.HasValue ? $"product:{x.Promotion.ProductId}"
+                        : x.Promotion.CategoryId.HasValue ? $"category:{x.Promotion.CategoryId}"
+                        : "cart")
+            .Select(g => g.MaxBy(x => x.Discount))
+            .Select(x => new AppliedPromotionDTO { PromotionId = x.Promotion.Id, PromotionName = x.Promotion.Name, Discount = x.Discount })
             .ToList();
 
-        var totalDiscount = Math.Max(appliedPromotions.Sum(x => x.Discount), -subtotal);
+        // Discount is stored as a positive value; cap total so it never exceeds the subtotal
+        var totalDiscount = Math.Min(appliedPromotions.Sum(x => x.Discount), subtotal);
 
         return new CartGetDTO
         {
@@ -40,7 +48,7 @@ public class CartItemService(
             Subtotal = subtotal,
             AppliedPromotions = appliedPromotions,
             TotalDiscount = totalDiscount,
-            Total = subtotal + totalDiscount
+            Total = subtotal - totalDiscount
         };
     }
 
@@ -54,12 +62,19 @@ public class CartItemService(
 
     public async Task<CartGetDTO> CreateAsync(CartItemCreateDTO dto, int userId)
     {
+        var product = await productRepository.GetByIdAsync(dto.ProductId);
+
         var existing = await cartItemRepository.GetAllAsQueryable()
             .FirstOrDefaultAsync(i => i.ProductId == dto.ProductId && i.UserId == userId);
 
+        var newQuantity = (existing?.Quantity ?? 0) + dto.Quantity;
+        if (newQuantity > product.StockQuantity)
+            throw new InvalidOperationException(
+                $"Requested quantity ({newQuantity}) exceeds available stock ({product.StockQuantity}) for '{product.Name}'.");
+
         if (existing is not null)
         {
-            existing.Quantity += dto.Quantity;
+            existing.Quantity = newQuantity;
             await cartItemRepository.UpdateAsync(existing);
         }
         else
@@ -80,6 +95,12 @@ public class CartItemService(
         var cartItem = await cartItemRepository.GetByIdAsync(id);
         if (cartItem.UserId != userId)
             throw new UnauthorizedAccessException("You do not have access to this cart item.");
+
+        var product = await productRepository.GetByIdAsync(cartItem.ProductId);
+        if (dto.Quantity > product.StockQuantity)
+            throw new InvalidOperationException(
+                $"Requested quantity ({dto.Quantity}) exceeds available stock ({product.StockQuantity}) for '{product.Name}'.");
+
         cartItem.Quantity = dto.Quantity;
         await cartItemRepository.UpdateAsync(cartItem);
         return await GetAllAsync(userId);
@@ -202,7 +223,7 @@ public class CartItemService(
             }
             else if (message is WorkflowErrorEvent errorEvent)
             {
-                throw new InvalidOperationException(errorEvent.Exception?.Message);
+                throw new InvalidOperationException(errorEvent.Exception?.Message ?? "Workflow error occurred.");
             }
         }
 
