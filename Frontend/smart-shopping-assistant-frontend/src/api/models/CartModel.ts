@@ -1,4 +1,5 @@
 export interface AppliedPromotionModel {
+  promotionId: number;
   promotionName: string;
   discount: number;
 }

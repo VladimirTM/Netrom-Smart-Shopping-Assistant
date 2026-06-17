@@ -1,6 +1,7 @@
 import {
   Alert,
   Box,
+  Button,
   CircularProgress,
   Divider,
   IconButton,
@@ -18,7 +19,9 @@ import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
 import HistoryIcon from "@mui/icons-material/History";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { useEffect, useState } from "react";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { activityLogApi } from "../../api/clients/ActivityLogApiClient";
 import type { ActivityLogModel } from "../../api/models/ActivityLogModel";
 
@@ -49,40 +52,47 @@ function formatAction(log: ActivityLogModel): string {
   return `${log.entityType} "${log.entityName}" ${verb}`;
 }
 
+const PREVIEW_LIMIT = 10;
+
 function ActivityLog() {
   const [logs, setLogs] = useState<ActivityLogModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const mountedRef = useRef(true);
+  const navigate = useNavigate();
 
   function loadLogs() {
     activityLogApi
-      .getLatest(30)
+      .getLatest(PREVIEW_LIMIT)
       .then((data) => {
+        if (!mountedRef.current) return;
         setLogs(data);
         setError("");
       })
-      .catch((err) => setError((err as Error).message))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (mountedRef.current) setError((err as Error).message); })
+      .finally(() => { if (mountedRef.current) setLoading(false); });
   }
 
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      const data = await activityLogApi.getLatest(30);
+      const data = await activityLogApi.getLatest(PREVIEW_LIMIT);
+      if (!mountedRef.current) return;
       setLogs(data);
       setError("");
     } catch (err) {
-      setError((err as Error).message);
+      if (mountedRef.current) setError((err as Error).message);
     } finally {
-      setRefreshing(false);
+      if (mountedRef.current) setRefreshing(false);
     }
   }
 
   useEffect(() => {
+    mountedRef.current = true;
     loadLogs();
-    const interval = setInterval(loadLogs, 60_000);
-    return () => clearInterval(interval);
+    return () => { mountedRef.current = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -148,6 +158,16 @@ function ActivityLog() {
           ))}
         </List>
       )}
+
+      <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
+        <Button
+          size="small"
+          endIcon={<OpenInNewIcon fontSize="small" />}
+          onClick={() => navigate("/activity-log")}
+        >
+          View all activity
+        </Button>
+      </Box>
     </Paper>
   );
 }

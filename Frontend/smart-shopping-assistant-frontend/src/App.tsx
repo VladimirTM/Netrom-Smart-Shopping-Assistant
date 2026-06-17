@@ -24,6 +24,7 @@ import Checkout from "./components/Checkout";
 import Orders from "./components/Orders";
 import Profile from "./components/Profile";
 import ManageOrders from "./components/ManageOrders";
+import ActivityLogPage from "./components/ActivityLogPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -131,6 +132,14 @@ function AppRoutes() {
           element={
             <AdminRoute>
               <ManageOrders />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/activity-log"
+          element={
+            <AdminRoute>
+              <ActivityLogPage />
             </AdminRoute>
           }
         />

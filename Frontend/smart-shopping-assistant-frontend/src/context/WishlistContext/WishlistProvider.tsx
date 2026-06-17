@@ -21,14 +21,10 @@ function WishlistProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(
     async (productId: number) => {
       const inWishlist = items.has(productId);
-      try {
-        const data = inWishlist
-          ? await wishlistApi.removeItem(productId)
-          : await wishlistApi.addItem(productId);
-        setItems(new Set(data.productIds));
-      } catch {
-        // keep existing state on error
-      }
+      const data = inWishlist
+        ? await wishlistApi.removeItem(productId)
+        : await wishlistApi.addItem(productId);
+      setItems(new Set(data.productIds));
     },
     [items]
   );

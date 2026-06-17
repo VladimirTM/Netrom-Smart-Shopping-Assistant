@@ -117,6 +117,12 @@ function NavBar() {
               <Button component={NavLink} to="/manage-orders" sx={navButtonSx}>
                 Orders
               </Button>
+              <Button component={NavLink} to="/activity-log" sx={navButtonSx}>
+                Activity
+              </Button>
+              <Button component={NavLink} to="/shop" sx={navButtonSx}>
+                View Shop
+              </Button>
             </>
           ) : (
             <>
