@@ -45,18 +45,46 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
   const [messageIndex, setMessageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
-  const { addItem } = useCart();
+  const { addItem, cart } = useCart();
+
+  const cartFingerprint = cart?.items
+    .map((i) => `${i.productId}:${i.quantity}`)
+    .sort()
+    .join(",") ?? "";
+
+  const cacheKey = `analyze_cache:${cartFingerprint}`;
 
   useEffect(() => {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setAnalysis(JSON.parse(cached) as Analysis);
+        setProgress(100);
+        setLoading(false);
+        return;
+      } catch {
+        sessionStorage.removeItem(cacheKey);
+      }
+    }
+
     cartApi
       .analyze()
       .then((data) => {
         setProgress(100);
         setAnalysis(data);
         setError("");
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+        } catch {
+          // sessionStorage may be full or unavailable — proceed without caching
+        }
+        setTimeout(() => setLoading(false), 300);
       })
-      .catch((err: Error) => setError(err.message || "Failed to analyze cart"))
-      .finally(() => setTimeout(() => setLoading(false), 300));
+      .catch((err: Error) => {
+        setError(err.message || "Failed to analyze cart");
+        setLoading(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -97,7 +125,7 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
   const allDecided =
     analysis !== null &&
     analysis.suggestions.length > 0 &&
-    analysis.suggestions.every((s) => decisions[s.productId] !== undefined && decisions[s.productId] !== "error");
+    analysis.suggestions.every((s) => decisions[s.productId] !== undefined);
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
@@ -128,16 +156,14 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
             <LinearProgress
               variant="determinate"
               value={progress}
-              sx={{ transition: "value 0.4s ease" }}
             />
           </Box>
         )}
-        {error !== "" && (
+        {error !== "" ? (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
-        )}
-        {analysis !== null && !loading && (
+        ) : analysis !== null && !loading ? (
           <Stack spacing={2}>
             <Typography>{analysis.summary}</Typography>
             <Divider />
@@ -264,7 +290,7 @@ function AnalyzeDialog({ onClose }: AnalyzeDialogProps) {
               </Box>
             )}
           </Stack>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );

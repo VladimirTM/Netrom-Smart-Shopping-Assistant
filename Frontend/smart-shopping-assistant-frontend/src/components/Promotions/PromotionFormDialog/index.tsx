@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Autocomplete,
   Button,
   Checkbox,
   CircularProgress,
@@ -19,6 +20,10 @@ import {
 import type { Promotion } from "../../shared/types/Promotion";
 import { PromotionReward, PromotionType } from "../../shared/types/Promotion";
 import { promotionsApi } from "../../../api/clients/PromotionApiClient";
+import { productsApi } from "../../../api/clients/ProductApiClient";
+import { categoriesApi } from "../../../api/clients/CategoryApiClient";
+import type { Product } from "../../shared/types/Product";
+import type { Category } from "../../shared/types/Category";
 
 interface PromotionFormDialogProps {
   promotion: Promotion | null;
@@ -46,15 +51,64 @@ function PromotionFormDialog({
   const [rewardValue, setRewardValue] = useState(
     promotion?.rewardValue.toString() ?? ""
   );
-  const [productId, setProductId] = useState(
-    promotion?.productId?.toString() ?? ""
-  );
-  const [categoryId, setCategoryId] = useState(
-    promotion?.categoryId?.toString() ?? ""
-  );
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [isActive, setIsActive] = useState(promotion?.isActive ?? true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [productOptions, setProductOptions] = useState<Product[]>([]);
+  const [productInputValue, setProductInputValue] = useState("");
+  const [searchingProducts, setSearchingProducts] = useState(false);
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const cats = await categoriesApi.getAll();
+        setCategories(cats);
+        if (promotion?.categoryId != null) {
+          setSelectedCategory(cats.find((c) => c.id === promotion.categoryId) ?? null);
+        }
+        if (promotion?.productId != null) {
+          const prod = await productsApi.getById(promotion.productId);
+          setSelectedProduct(prod);
+          setProductOptions([prod]);
+          setProductInputValue(prod.name);
+        }
+      } catch {
+        setError("Failed to load options. Please close and try again.");
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleProductInputChange(_: React.SyntheticEvent, value: string) {
+    setProductInputValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 1) {
+      setProductOptions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearchingProducts(true);
+      try {
+        const results = await productsApi.search(value.trim());
+        setProductOptions(results);
+      } catch {
+        // silently ignore search errors
+      } finally {
+        setSearchingProducts(false);
+      }
+    }, 300);
+  }
 
   async function handleSave() {
     if (name.trim() === "") {
@@ -62,13 +116,13 @@ function PromotionFormDialog({
       return;
     }
     const parsedThreshold = parseFloat(threshold);
-    if (isNaN(parsedThreshold) || parsedThreshold < 0) {
-      setError("Threshold must be a valid non-negative number.");
+    if (isNaN(parsedThreshold) || parsedThreshold <= 0) {
+      setError("Threshold must be a valid positive number.");
       return;
     }
     const parsedRewardValue = parseInt(rewardValue, 10);
-    if (isNaN(parsedRewardValue) || parsedRewardValue < 0) {
-      setError("Reward value must be a valid non-negative integer.");
+    if (isNaN(parsedRewardValue) || parsedRewardValue <= 0) {
+      setError("Reward value must be a valid positive integer.");
       return;
     }
     setSaving(true);
@@ -80,8 +134,8 @@ function PromotionFormDialog({
         threshold: parsedThreshold,
         reward,
         rewardValue: parsedRewardValue,
-        productId: productId !== "" ? parseInt(productId, 10) : undefined,
-        categoryId: categoryId !== "" ? parseInt(categoryId, 10) : undefined,
+        productId: selectedProduct?.id,
+        categoryId: selectedCategory?.id,
         isActive,
       };
       if (isEditing) {
@@ -162,21 +216,61 @@ function PromotionFormDialog({
             type="number"
             slotProps={{ htmlInput: { min: 0 } }}
           />
-          <TextField
-            label="Product ID (optional)"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            fullWidth
-            type="number"
-            slotProps={{ htmlInput: { min: 1 } }}
+          <Autocomplete
+            options={productOptions}
+            getOptionLabel={(p) => `${p.name} (ID: ${p.id})`}
+            value={selectedProduct}
+            inputValue={productInputValue}
+            onInputChange={handleProductInputChange}
+            onChange={(_, value) => {
+              setSelectedProduct(value);
+              if (value) setSelectedCategory(null);
+            }}
+            disabled={selectedCategory !== null}
+            loading={searchingProducts}
+            filterOptions={(x) => x}
+            noOptionsText={productInputValue.length < 1 ? "Type to search products" : "No products found"}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Product (optional)"
+                helperText={selectedCategory ? "Clear Category first" : "Type a product name to search"}
+                slotProps={{
+                  ...params.slotProps,
+                  input: {
+                    ...params.slotProps?.input,
+                    endAdornment: (
+                      <>
+                        {searchingProducts ? <CircularProgress size={16} /> : null}
+                        {params.slotProps?.input?.endAdornment}
+                      </>
+                    ),
+                  },
+                }}
+              />
+            )}
           />
-          <TextField
-            label="Category ID (optional)"
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            fullWidth
-            type="number"
-            slotProps={{ htmlInput: { min: 1 } }}
+          <Autocomplete
+            options={categories}
+            getOptionLabel={(c) => `${c.name} (ID: ${c.id})`}
+            value={selectedCategory}
+            onChange={(_, value) => {
+              setSelectedCategory(value);
+              if (value) {
+                setSelectedProduct(null);
+                setProductInputValue("");
+                setProductOptions([]);
+              }
+            }}
+            disabled={selectedProduct !== null || loadingCategories}
+            loading={loadingCategories}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Category (optional)"
+                helperText={selectedProduct ? "Clear Product first" : "Leave empty for cart-wide promotion"}
+              />
+            )}
           />
           <FormControlLabel
             control={

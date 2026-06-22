@@ -25,6 +25,7 @@ function Register() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,8 +35,8 @@ function Register() {
       setError("Passwords do not match.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
 
@@ -118,13 +119,29 @@ function Register() {
           />
           <TextField
             label="Confirm password"
-            type={showPassword ? "text" : "password"}
+            type={showConfirmPassword ? "text" : "password"}
             fullWidth
             required
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             sx={{ mb: 3 }}
             autoComplete="new-password"
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      edge="end"
+                      size="small"
+                      aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    >
+                      {showConfirmPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
           <Button
             type="submit"

@@ -38,9 +38,22 @@ function BannerFormDialog({ banner, onClose, onSaved }: BannerFormDialogProps) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  function isValidUrl(value: string): boolean {
+    if (value.startsWith("/")) return true;
+    try { new URL(value); return true; } catch { return false; }
+  }
+
   async function handleSave() {
     if (title.trim() === "") {
       setError("Title is required.");
+      return;
+    }
+    if (imageUrl.trim() !== "" && !isValidUrl(imageUrl.trim())) {
+      setError("Image URL must be a valid URL (e.g. https://example.com/image.jpg).");
+      return;
+    }
+    if (linkTo.trim() !== "" && !isValidUrl(linkTo.trim())) {
+      setError("Link URL must be a valid URL (e.g. https://example.com).");
       return;
     }
     const parsedOrder = parseInt(displayOrder, 10);

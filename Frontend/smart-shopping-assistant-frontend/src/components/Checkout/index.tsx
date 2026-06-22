@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -81,6 +82,7 @@ function ReviewStep() {
                   <Typography sx={{ minWidth: 24, textAlign: "center" }}>{item.quantity}</Typography>
                   <IconButton
                     size="small"
+                    disabled={item.quantity >= item.stockQuantity}
                     onClick={() => updateQuantity(item.id, item.quantity + 1)}
                   >
                     <AddIcon fontSize="small" />
@@ -178,8 +180,17 @@ function ConfirmStep({ shipping }: ConfirmStepProps) {
   const { cart } = useCart();
   if (!cart) return null;
 
+  const stockWarningItems = cart.items.filter((i) => i.stockQuantity < i.quantity);
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      {stockWarningItems.length > 0 && (
+        <Alert severity="warning">
+          Some items may have limited stock since you added them to your cart:{" "}
+          {stockWarningItems.map((i) => i.productName).join(", ")}. Please review before placing your order.
+        </Alert>
+      )}
+
       <Box>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
           Shipping to
@@ -223,7 +234,7 @@ function ConfirmStep({ shipping }: ConfirmStepProps) {
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
         {cart.appliedPromotions.map((p) => (
           <Typography key={p.promotionName} color="success.main" variant="body2">
-            {p.promotionName}: -{fmt(Math.abs(p.discount))}
+            {p.promotionName}: -{fmt(p.discount)}
           </Typography>
         ))}
         <Divider sx={{ width: "100%", my: 0.5 }} />
@@ -272,6 +283,7 @@ function Checkout() {
       }
     }
     setActiveStep((s) => s + 1);
+    window.scrollTo(0, 0);
   }
 
   function handleBack() {
@@ -299,7 +311,7 @@ function Checkout() {
     }
   }
 
-  if (isEmpty && activeStep === 0) {
+  if (isEmpty) {
     return (
       <Container maxWidth="sm" sx={{ py: 8, textAlign: "center" }}>
         <Typography variant="h5" gutterBottom>

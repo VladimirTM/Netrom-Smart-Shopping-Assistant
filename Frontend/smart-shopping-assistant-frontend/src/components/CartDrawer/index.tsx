@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Divider,
@@ -7,6 +8,7 @@ import {
   List,
   ListItem,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -17,19 +19,43 @@ import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useCart } from "../../context/CartContent/cart-context";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AnalyzeDialog from "./AnalyzeDialog";
 import { fmt } from "../../utils/currency";
 
 function CartDrawer() {
-  const { cart, open, closeCart, updateQuantity, removeProduct } = useCart();
+  const { cart, cartError, open, closeCart, updateQuantity, removeProduct } = useCart();
   const navigate = useNavigate();
 
   const isEmpty = cart === null || cart.items.length === 0;
   const itemCount =
     cart?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   const [analyzeOpen, setAnalyzeOpen] = useState(false);
+  const [inputQty, setInputQty] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (!cart) return;
+    setInputQty(() => {
+      const next: Record<number, string> = {};
+      cart.items.forEach((item) => { next[item.id] = String(item.quantity); });
+      return next;
+    });
+  }, [cart]);
+
+  function commitQty(id: number, currentQty: number, maxQty: number) {
+    const raw = inputQty[id] ?? "";
+    const parsed = parseInt(raw, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      setInputQty((prev) => ({ ...prev, [id]: String(currentQty) }));
+      return;
+    }
+    const clamped = Math.min(parsed, maxQty);
+    if (clamped !== currentQty) {
+      updateQuantity(id, clamped);
+    }
+    setInputQty((prev) => ({ ...prev, [id]: String(clamped) }));
+  }
 
   return (
     <Drawer anchor="right" open={open} onClose={closeCart}>
@@ -80,7 +106,11 @@ function CartDrawer() {
           </IconButton>
         </Box>
 
-        {isEmpty ? (
+        {cartError !== null ? (
+          <Box sx={{ flexGrow: 1, p: 3 }}>
+            <Alert severity="error">{cartError}</Alert>
+          </Box>
+        ) : isEmpty ? (
           <Box
             sx={{
               flexGrow: 1,
@@ -170,16 +200,31 @@ function CartDrawer() {
                       >
                         <RemoveIcon fontSize="small" />
                       </IconButton>
-                      <Typography
-                        sx={{
-                          mx: 1.5,
-                          minWidth: 20,
-                          textAlign: "center",
-                          fontWeight: 500,
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={inputQty[item.id] ?? item.quantity}
+                        onChange={(e) =>
+                          setInputQty((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                        onBlur={() => commitQty(item.id, item.quantity, item.stockQuantity)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitQty(item.id, item.quantity, item.stockQuantity);
                         }}
-                      >
-                        {item.quantity}
-                      </Typography>
+                        slotProps={{
+                          htmlInput: {
+                            min: 1,
+                            max: item.stockQuantity,
+                            style: { textAlign: "center", padding: "4px 2px" },
+                          },
+                        }}
+                        sx={{
+                          width: 56,
+                          mx: 0.5,
+                          "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": { display: "none" },
+                          "& input[type=number]": { MozAppearance: "textfield" },
+                        }}
+                      />
                       <IconButton
                         size="small"
                         onClick={() =>
@@ -220,7 +265,7 @@ function CartDrawer() {
               </Box>
               {cart.appliedPromotions.map((promotion) => (
                 <Box
-                  key={promotion.promotionName}
+                  key={promotion.promotionId}
                   sx={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -231,7 +276,7 @@ function CartDrawer() {
                     {promotion.promotionName}
                   </Typography>
                   <Typography color="success.main" variant="body2">
-                    -{fmt(Math.abs(promotion.discount))}
+                    -{fmt(promotion.discount)}
                   </Typography>
                 </Box>
               ))}

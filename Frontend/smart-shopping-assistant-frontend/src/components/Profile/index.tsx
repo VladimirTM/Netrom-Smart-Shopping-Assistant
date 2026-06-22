@@ -67,8 +67,8 @@ function Profile() {
       setPasswordError("New passwords do not match.");
       return;
     }
-    if (newPassword.length < 6) {
-      setPasswordError("New password must be at least 6 characters.");
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.");
       return;
     }
     setSavingPassword(true);
@@ -175,14 +175,16 @@ function Profile() {
           onChange={(e) => setCurrentPassword(e.target.value)}
           size="small"
           sx={{ mb: 2 }}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setShowCurrentPw((v) => !v)} edge="end">
-                  {showCurrentPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                </IconButton>
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setShowCurrentPw((v) => !v)} edge="end">
+                    {showCurrentPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <Divider sx={{ mb: 2 }} />
@@ -194,14 +196,16 @@ function Profile() {
           onChange={(e) => setNewPassword(e.target.value)}
           size="small"
           sx={{ mb: 2 }}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setShowNewPw((v) => !v)} edge="end">
-                  {showNewPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                </IconButton>
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setShowNewPw((v) => !v)} edge="end">
+                    {showNewPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <TextField
@@ -212,14 +216,16 @@ function Profile() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           size="small"
           sx={{ mb: 2 }}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setShowConfirmPw((v) => !v)} edge="end">
-                  {showConfirmPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                </IconButton>
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setShowConfirmPw((v) => !v)} edge="end">
+                    {showConfirmPw ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
           }}
         />
         <Button

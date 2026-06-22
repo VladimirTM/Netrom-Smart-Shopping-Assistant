@@ -15,7 +15,7 @@ import {
 import AddShoppingCartIcon from "@mui/icons-material/AddShoppingCart";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import FavoriteIcon from "@mui/icons-material/Favorite";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { productsApi } from "../../api/clients/ProductApiClient";
 import type { Product } from "../shared/types/Product";
@@ -36,19 +36,28 @@ function Wishlist() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [addingId, setAddingId] = useState<number | null>(null);
+  const prevItemsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
+    const prev = prevItemsRef.current;
+    prevItemsRef.current = new Set(items);
+
+    // Pure removal: all surviving ids were already loaded — filter locally, no API call needed
+    if ([...items].every((id) => prev.has(id)) && prev.size > items.size) {
+      setProducts((ps) => ps.filter((p) => items.has(p.id)));
+      return;
+    }
+
     if (items.size === 0) {
+      setProducts([]);
       setLoading(false);
       return;
     }
-    productsApi.getAll()
+    productsApi.getByIds([...items])
       .then(setProducts)
       .catch((err) => setError((err as Error).message))
       .finally(() => setLoading(false));
   }, [items]);
-
-  const visibleProducts = products.filter((p) => items.has(p.id));
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -58,7 +67,7 @@ function Wishlist() {
           Wishlist
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {visibleProducts.length} item{visibleProducts.length !== 1 ? "s" : ""}
+          {products.length} item{products.length !== 1 ? "s" : ""}
         </Typography>
       </Box>
 
@@ -68,7 +77,7 @@ function Wishlist() {
         <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
           <CircularProgress />
         </Box>
-      ) : visibleProducts.length === 0 ? (
+      ) : products.length === 0 ? (
         <Box sx={{ textAlign: "center", mt: 8 }}>
           <FavoriteIcon sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
           <Typography variant="h6" color="text.secondary">
@@ -89,7 +98,7 @@ function Wishlist() {
             gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
           }}
         >
-          {visibleProducts.map((product) => (
+          {products.map((product) => (
             <Card
               key={product.id}
               sx={{

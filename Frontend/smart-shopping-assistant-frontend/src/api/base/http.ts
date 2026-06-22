@@ -24,14 +24,24 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && localStorage.getItem(TOKEN_KEY)) {
       onUnauthorized?.();
     }
     const data = error.response?.data;
-    const message =
-      typeof data === "string" && data !== ""
-        ? data
-        : error.message || "Request failed";
+    let message: string;
+    if (typeof data === "string" && data !== "") {
+      message = data;
+    } else if (data && typeof data === "object") {
+      const errors = data.errors as Record<string, string[]> | undefined;
+      message =
+        data.detail ??
+        data.title ??
+        (errors ? Object.values(errors).flat()[0] : null) ??
+        error.message ??
+        "Request failed";
+    } else {
+      message = error.message || "Request failed";
+    }
     return Promise.reject(new Error(message));
   },
 );

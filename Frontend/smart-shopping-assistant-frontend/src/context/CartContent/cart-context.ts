@@ -3,6 +3,7 @@ import type { Cart } from "../../components/shared/types/Cart";
 
 export interface CartContextValue {
   cart: Cart | null;
+  cartError: string | null;
   open: boolean;
   openCart: () => void;
   closeCart: () => void;

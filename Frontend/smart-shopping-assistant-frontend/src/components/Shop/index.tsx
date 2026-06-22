@@ -65,19 +65,21 @@ function Shop() {
   const [aiLoading, setAiLoading] = useState(false);
 
   const [addingId, setAddingId] = useState<number | null>(null);
+  const [wishlistLoadingId, setWishlistLoadingId] = useState<number | null>(null);
 
-  const { addItem } = useCart();
+  const { addItem, cart } = useCart();
   const { toggle: toggleWishlist, has: isWishlisted } = useWishlist();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
-    Promise.all([productsApi.getAll(), categoriesApi.getAll()])
-      .then(([prods, cats]) => {
+    // Products are required; categories are optional (failure hides the sidebar filter only)
+    productsApi.getAll()
+      .then((prods) => {
         setProducts(prods);
-        setCategories(cats);
 
         if (prods.length > 0) {
           const prices = prods.map((p) => p.price);
@@ -105,6 +107,11 @@ function Shop() {
       })
       .catch((err) => setError((err as Error).message))
       .finally(() => setLoading(false));
+
+    // Categories are independent; failure only hides the sidebar category filter
+    categoriesApi.getAll()
+      .then(setCategories)
+      .catch(() => { /* categories unavailable — sidebar filter hidden */ });
   }, []);
 
   // Re-apply category from URL param when categories are loaded or URL changes
@@ -132,12 +139,37 @@ function Shop() {
     return () => clearTimeout(timer);
   }, [search, aiMode]);
 
-  const priceMin = products.length
-    ? Math.floor(Math.min(...products.map((p) => p.price)))
-    : 0;
-  const priceMax = products.length
-    ? Math.ceil(Math.max(...products.map((p) => p.price)))
-    : 10000;
+  // Global extremes (used to initialise the slider and "clear filters")
+  const priceMin = useMemo(
+    () => (products.length ? Math.floor(Math.min(...products.map((p) => p.price))) : 0),
+    [products],
+  );
+  const priceMax = useMemo(
+    () => (products.length ? Math.ceil(Math.max(...products.map((p) => p.price))) : 10000),
+    [products],
+  );
+
+  // Effective slider bounds: filtered by everything EXCEPT price so the range shrinks with other filters
+  const sliderBase = useMemo(() => {
+    const base = aiMode && aiResults !== null ? aiResults : products;
+    return base.filter((p) => {
+      const q = search.trim().toLowerCase();
+      const matchesSearch = aiMode || !q ? true : p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q);
+      const matchesCategory = selectedCategories.length === 0 || p.categories.some((c) => selectedCategories.includes(c.id));
+      const matchesPromotion = !onPromotionOnly || promotedProductIds.has(p.id);
+      const matchesStock = !inStockOnly || p.stockQuantity > 0;
+      return matchesSearch && matchesCategory && matchesPromotion && matchesStock;
+    });
+  }, [products, aiResults, aiMode, search, selectedCategories, onPromotionOnly, inStockOnly, promotedProductIds]);
+
+  const sliderMin = useMemo(
+    () => (sliderBase.length ? Math.floor(Math.min(...sliderBase.map((p) => p.price))) : priceMin),
+    [sliderBase, priceMin],
+  );
+  const sliderMax = useMemo(
+    () => (sliderBase.length ? Math.ceil(Math.max(...sliderBase.map((p) => p.price))) : priceMax),
+    [sliderBase, priceMax],
+  );
 
   const toggleCategory = (id: number) => {
     setSelectedCategories((prev) =>
@@ -190,7 +222,6 @@ function Shop() {
     return filtered;
   }, [products, aiResults, aiMode, search, selectedCategories, priceRange, sort, onPromotionOnly, inStockOnly, promotedProductIds]);
 
-  const displayedProducts = visibleProducts;
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -215,7 +246,7 @@ function Shop() {
           </Typography>
           {!loading && (
             <Typography variant="body2" color="text.secondary">
-              {displayedProducts.length} product{displayedProducts.length !== 1 ? "s" : ""}
+              {visibleProducts.length} product{visibleProducts.length !== 1 ? "s" : ""}
               {aiMode && aiResults !== null && (
                 <Typography component="span" variant="body2" color="primary" sx={{ ml: 0.5 }}>
                   (AI)
@@ -243,7 +274,7 @@ function Shop() {
       </Box>
 
       {/* Search + AI toggle */}
-      <Box sx={{ display: "flex", gap: 1, mb: 3, alignItems: "center" }}>
+      <Box sx={{ display: "flex", gap: 1, mb: aiMode && !isAuthenticated ? 1 : 3, alignItems: "center" }}>
         <TextField
           placeholder={aiMode ? "Describe what you're looking for…" : "Search products by name or description"}
           value={search}
@@ -291,6 +322,21 @@ function Shop() {
           </IconButton>
         </Tooltip>
       </Box>
+
+      {aiMode && !isAuthenticated && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <strong>AI search requires an account.</strong>{" "}
+          <Typography
+            component="span"
+            variant="body2"
+            sx={{ cursor: "pointer", textDecoration: "underline" }}
+            onClick={() => navigate("/login", { state: { from: "/shop" } })}
+          >
+            Sign in
+          </Typography>{" "}
+          to use AI semantic search.
+        </Alert>
+      )}
 
       <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
         {/* Sidebar */}
@@ -359,13 +405,13 @@ function Shop() {
           </Typography>
           <Box sx={{ px: 1, mt: 1.5 }}>
             <Slider
-              value={priceRange}
-              min={priceMin}
-              max={priceMax}
+              value={[Math.max(priceRange[0], sliderMin), Math.min(priceRange[1], sliderMax)]}
+              min={sliderMin}
+              max={sliderMax}
               onChange={(_e, val) => setPriceRange(val as [number, number])}
               valueLabelDisplay="auto"
               valueLabelFormat={(v) => fmt(v)}
-              disabled={loading}
+              disabled={loading || sliderMin === sliderMax}
             />
             <Box sx={{ display: "flex", justifyContent: "space-between" }}>
               <Typography variant="caption" color="text.secondary">
@@ -436,7 +482,13 @@ function Shop() {
               gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
             }}
           >
-            {displayedProducts.map((product) => (
+            {visibleProducts.map((product) => {
+              const cartQty = cart?.items.find((i) => i.productId === product.id)?.quantity ?? 0;
+              const effectiveStock = Math.max(0, product.stockQuantity - cartQty);
+              const outOfStock = product.stockQuantity === 0;
+              const atStockLimit = !outOfStock && effectiveStock === 0;
+              const lowStock = effectiveStock > 0 && effectiveStock < 5;
+              return (
               <Card
                 key={product.id}
                 sx={{
@@ -476,32 +528,44 @@ function Shop() {
                       }}
                     />
                   )}
-                  <Tooltip title={isWishlisted(product.id) ? "Remove from wishlist" : "Save to wishlist"}>
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        if (!isAuthenticated) { navigate("/login"); return; }
-                        const wasWishlisted = isWishlisted(product.id);
-                        void toggleWishlist(product.id);
-                        showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
-                      }}
-                      sx={{
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        bgcolor: "background.paper",
-                        "&:hover": { bgcolor: "background.paper" },
-                        boxShadow: 1,
-                        p: 0.5,
-                      }}
-                    >
-                      {isWishlisted(product.id) ? (
-                        <FavoriteIcon fontSize="small" color="error" />
-                      ) : (
-                        <FavoriteBorderIcon fontSize="small" />
-                      )}
-                    </IconButton>
-                  </Tooltip>
+                  {!isAdmin && (
+                    <Tooltip title={isWishlisted(product.id) ? "Remove from wishlist" : "Save to wishlist"}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          disabled={wishlistLoadingId === product.id}
+                          onClick={async () => {
+                            if (!isAuthenticated) { navigate("/login"); return; }
+                            const wasWishlisted = isWishlisted(product.id);
+                            setWishlistLoadingId(product.id);
+                            try {
+                              await toggleWishlist(product.id);
+                              showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+                            } catch {
+                              showToast("Failed to update wishlist", "error");
+                            } finally {
+                              setWishlistLoadingId(null);
+                            }
+                          }}
+                          sx={{
+                            position: "absolute",
+                            top: 4,
+                            right: 4,
+                            bgcolor: "background.paper",
+                            "&:hover": { bgcolor: "background.paper" },
+                            boxShadow: 1,
+                            p: 0.5,
+                          }}
+                        >
+                          {isWishlisted(product.id) ? (
+                            <FavoriteIcon fontSize="small" color="error" />
+                          ) : (
+                            <FavoriteBorderIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
                 </Box>
                 <CardContent sx={{ flexGrow: 1, pb: 1 }}>
                   <Typography
@@ -534,39 +598,49 @@ function Shop() {
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "primary.dark" }}>
                       {fmt(product.price)}
                     </Typography>
-                    {product.stockQuantity === 0 && (
+                    {outOfStock && (
                       <Chip label="Out of stock" size="small" color="error" sx={{ height: 18, fontSize: "0.68rem" }} />
                     )}
-                    {product.stockQuantity > 0 && product.stockQuantity < 5 && (
+                    {!outOfStock && atStockLimit && (
+                      <Chip label="Max in cart" size="small" color="warning" sx={{ height: 18, fontSize: "0.68rem" }} />
+                    )}
+                    {lowStock && (
                       <Chip label="Low stock" size="small" color="warning" sx={{ height: 18, fontSize: "0.68rem" }} />
                     )}
                   </Box>
                 </CardContent>
-                <CardActions sx={{ px: 1.5, pb: 1.5, pt: 0 }}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    size="small"
-                    startIcon={addingId === product.id ? <CircularProgress size={14} color="inherit" /> : <AddShoppingCartIcon fontSize="small" />}
-                    onClick={async () => {
-                      if (!isAuthenticated) { navigate("/login"); return; }
-                      if (addingId !== null) return;
-                      setAddingId(product.id);
-                      try {
-                        await addItem(product.id, 1);
-                        showToast(`${product.name} added to cart`);
-                      } finally {
-                        setAddingId(null);
-                      }
-                    }}
-                    disabled={product.stockQuantity === 0 || addingId === product.id}
-                  >
-                    {product.stockQuantity === 0 ? "Out of Stock" : "Add to Cart"}
-                  </Button>
-                </CardActions>
+                {!isAdmin && (
+                  <CardActions sx={{ px: 1.5, pb: 1.5, pt: 0 }}>
+                    <Tooltip title={atStockLimit ? `You already have all ${effectiveStock} in stock in your cart` : ""} disableHoverListener={!atStockLimit}>
+                      <span style={{ width: "100%" }}>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          size="small"
+                          startIcon={addingId === product.id ? <CircularProgress size={14} color="inherit" /> : <AddShoppingCartIcon fontSize="small" />}
+                          onClick={async () => {
+                            if (!isAuthenticated) { navigate("/login"); return; }
+                            if (addingId !== null) return;
+                            setAddingId(product.id);
+                            try {
+                              await addItem(product.id, 1);
+                              showToast(`${product.name} added to cart`);
+                            } finally {
+                              setAddingId(null);
+                            }
+                          }}
+                          disabled={outOfStock || atStockLimit || addingId === product.id}
+                        >
+                          {outOfStock ? "Out of Stock" : atStockLimit ? "Max in Cart" : "Add to Cart"}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </CardActions>
+                )}
               </Card>
-            ))}
-            {displayedProducts.length === 0 && !aiLoading && (
+              );
+            })}
+            {visibleProducts.length === 0 && !aiLoading && (
               <Box sx={{ gridColumn: "1/-1", textAlign: "center", mt: 6, color: "text.secondary" }}>
                 <FilterListOffIcon sx={{ fontSize: 48, opacity: 0.3, mb: 1 }} />
                 <Typography variant="h6" color="text.secondary">No products found</Typography>

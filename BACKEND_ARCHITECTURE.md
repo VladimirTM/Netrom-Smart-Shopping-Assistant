@@ -47,10 +47,10 @@ Contains all database concerns: EF Core entity classes, the `DbContext`, reposit
 | `SmartShoppingAssistantDbContext.cs` | EF Core DbContext — `DbSet<T>` registrations for `Products`, `Categories`, `Promotions`, `CartItems`, `Users`, `Banners`, `ActivityLogs`, `Orders`, `OrderItems`, `WishlistItems`, `OrderAppliedPromotions`; Fluent API configuration calls |
 | `SmartShoppingAssistantDbContextFactory.cs` | IDesignTimeDbContextFactory used by the `dotnet ef` CLI for migration generation |
 | `Entities/` | One class per domain object |
-| `Configurations/` | Fluent API config extracted from DbContext per entity |
+| `Configurations/` | Fluent API config extracted from DbContext per entity — includes `OrderConfiguration` (indexes on `UserId`, `Status`, `PlacedAt`; precision on `Total`) and `UserConfiguration` (unique index on `Email`; max-length constraints) |
 | `Repositories/` | BaseRepository + specialised repositories |
 | `Seeders/` | Category, Product, Promotion, Banner, and User seeders run on startup |
-| `Migrations/` | EF-generated migration history |
+| `Migrations/` | EF-generated migration history — includes `AddIndexesAndOrderConfig` (DB indexes + Order/User Fluent configs), `RestrictCartItemProductDelete` (ON DELETE RESTRICT for CartItem → Product FK), `RemoveHasDataSeeds` (removes `HasData` seed calls from migrations in favour of runtime seeders) |
 
 ### 2.2 BusinessLogic
 
@@ -312,13 +312,14 @@ Extend `BaseRepository<T>` with domain-specific queries:
 
 | Repository | Extra methods |
 |-----------|---------------|
-| `IProductRepository` / `ProductRepository` | `GetAllWithDetailsAsync(categoryId?)`, `GetWithDetailsAsync(id)`, `GetRelatedAsync(id)` |
+| `IProductRepository` / `ProductRepository` | `GetAllWithDetailsAsync(categoryId?)`, `GetWithDetailsAsync(id)`, `GetRelatedAsync(id)`, `GetByIdsAsync(ids)` |
 | `ICartItemRepository` / `CartItemRepository` | `GetAllByUserIdAsync(userId)`, `GetByProductAndUserAsync(productId, userId)`, `GetByIdForUserAsync(id, userId)` |
 | `IOrderRepository` / `OrderRepository` | `GetByUserIdAsync(userId)`, `GetByIdWithItemsAsync(id)`, `GetAllWithUserAsync()` |
 | `IPromotionRepository` / `PromotionRepository` | `GetAllActiveAsync()`, `GetByProductIdAsync(productId)`, `GetByCategoryIdAsync(categoryId)` |
 | `IUserRepository` / `UserRepository` | `FindByEmailAsync(email)` |
-| `IActivityLogRepository` / `ActivityLogRepository` | `GetLatestAsync(limit)` |
+| `IActivityLogRepository` / `ActivityLogRepository` | `GetLatestAsync(limit, offset)`, `GetTotalCountAsync()` |
 | `IWishlistRepository` / `WishlistRepository` | `GetAllForUserAsync(userId)`, `FindByUserAndProductAsync(userId, productId)` |
+| `IBannerRepository` / `BannerRepository` | `GetAllActiveAsync()` — extends `IRepository<Banner>`; registered as both `IBannerRepository` and `IRepository<Banner>` in DI |
 
 ### DI Registration (Program.cs)
 
@@ -342,16 +343,35 @@ Each service is registered as `Scoped` (one instance per HTTP request).
 | Service Interface | Implementation | Responsibilities |
 |---|---|---|
 | `IAuthService` | `AuthService` | Register (BCrypt hash), Login (BCrypt verify + JWT), GetCurrentUser, UpdateProfile, ChangePassword |
-| `IProductService` | `ProductService` | CRUD + category assignment + related products + stock management |
+| `IProductService` | `ProductService` | CRUD + category assignment (bulk-validates category IDs) + related products + stock management + `GetByIdsAsync` |
 | `ICategoryService` | `CategoryService` | CRUD categories |
 | `IPromotionService` | `PromotionService` | CRUD promotions + `GetApplicablePromotionsAsync(cartItems)` |
-| `ICartItemService` | `CartItemService` | Add/update/remove cart items; `GetAllAsync` builds `CartGetDTO` with applied promotions; `AnalyzeCartAsync` orchestrates AI agents |
+| `ICartItemService` | `CartItemService` | Add/update/remove cart items with server-side stock validation; `GetAllAsync` builds `CartGetDTO` with best-promotion-wins grouping; `AnalyzeCartAsync` orchestrates AI agents |
 | `IOrderService` | `OrderService` | `PlaceOrderAsync` (clears cart, creates order + items + applied promotions snapshot, decrements stock); `GetOrdersAsync`; `GetAllOrdersAsync`; `UpdateOrderStatusAsync` |
-| `IBannerService` | `BannerService` | CRUD banners |
+| `IBannerService` | `BannerService` | CRUD banners; uses `IBannerRepository` for type-safe `GetAllActiveAsync()` |
 | `IAnalyticsService` | `AnalyticsService` | Aggregated summary: total revenue and order count (excluding `Pending` and `Cancelled`), top products by units sold (same filter), promotion usage count from `OrderAppliedPromotions` |
-| `IActivityLogService` | `ActivityLogService` | `LogAsync(action, entityType, entityId, entityName, actorId, actorEmail)` |
+| `IActivityLogService` | `ActivityLogService` | `LogAsync(...)`, `GetLatestAsync(limit, offset)`, `GetTotalCountAsync()` |
 | `IWishlistService` | `WishlistService` | `GetAsync` (list product IDs), `AddAsync` (idempotent add), `RemoveAsync` |
 | `IAiSearchService` | `AiSearchService` | Semantic product search using OpenAI embeddings/completions |
+
+### Stock validation in CartItemService
+
+`AddAsync` and `UpdateAsync` both validate that the requested quantity does not exceed `Product.StockQuantity` before writing to the database. If the combined in-cart quantity (existing + requested) would exceed stock, an `InvalidOperationException` is thrown and the controller returns `400 Bad Request` with a descriptive message. This prevents over-ordering without relying solely on frontend guards.
+
+### Best-promotion-wins per scope
+
+When multiple promotions could apply to the same target, `GetAllAsync` uses a **best-promotion-wins** strategy rather than stacking all applicable promotions:
+
+```csharp
+// Group candidates by their scope key
+.GroupBy(x => x.Promotion.ProductId.HasValue ? $"product:{x.Promotion.ProductId}"
+            : x.Promotion.CategoryId.HasValue ? $"category:{x.Promotion.CategoryId}"
+            : "cart")
+// Keep only the highest-discount promotion per group
+.Select(g => g.MaxBy(x => x.Discount))
+```
+
+Promotions scoped to different targets (e.g. one product-level and one category-level) can combine; only within the same target does only the best one win. Total discount is capped so it never exceeds the cart subtotal.
 
 ### Cart Analysis Flow (`AnalyzeCartAsync`)
 
@@ -482,7 +502,7 @@ Valid statuses: `Pending`, `Confirmed`, `Shipped`, `Delivered`, `Cancelled`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/activity-log` | Get latest N entries; `?limit=50` (default 50) |
+| GET | `/admin/activity-log` | Returns `{ logs: ActivityLogGetDTO[], total: int }`; `?limit=50` (capped at 1000) and `?offset=0` for pagination |
 
 ### Wishlist — `WishlistController`
 `[Route("api/wishlist")]` — entire controller requires `[Authorize]`
@@ -505,6 +525,17 @@ All three endpoints resolve the caller's `UserId` from the JWT `NameIdentifier` 
 ---
 
 ## 7. Authentication & Authorization
+
+### JWT Key Validation
+
+On startup, `Program.cs` asserts that `Jwt:Key` is at least 32 characters long before the authentication middleware is configured:
+
+```csharp
+if (jwtKey.Length < 32)
+    throw new InvalidOperationException("Jwt:Key must be at least 32 characters (256 bits) for HMAC-SHA256.");
+```
+
+This prevents a misconfigured key from reaching production.
 
 ### JWT Token
 
@@ -627,6 +658,8 @@ SwaggerUI (dev only — serves /swagger)
     ↓
 UseCors("FrontendPolicy")
     ↓
+Security headers middleware (inline app.Use)
+    ↓
 UseHttpsRedirection
     ↓
 UseRateLimiter
@@ -639,8 +672,20 @@ MapControllers
 ```
 
 **CORS Policy (`"FrontendPolicy"`):**
-- Development: `AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()`
+- Development: `WithOrigins("http://localhost:5173", "http://localhost:5174", "https://localhost:5173").AllowAnyMethod().AllowAnyHeader()` — restricted to known dev origins (not fully open)
 - Production: origins restricted to `Cors:AllowedOrigins` config section (defaults to `["http://localhost:5173"]`)
+
+**Security headers middleware:**
+
+An inline `app.Use` middleware injects security headers on every response:
+
+| Header | Value | Condition |
+|--------|-------|-----------|
+| `X-Content-Type-Options` | `nosniff` | Always |
+| `X-Frame-Options` | `DENY` | Always |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Always |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Production only |
+| `Content-Security-Policy` | `default-src 'self'` | Production only |
 
 **Startup tasks (before `app.Run()`):**
 1. `db.Database.MigrateAsync()` — applies pending EF migrations on every startup
@@ -688,6 +733,10 @@ Copy `appsettings.Example.json` to `appsettings.json` and fill in secrets. Never
     "Issuer": "SmartShoppingAssistant",
     "Audience": "SmartShoppingAssistant",
     "ExpiresInDays": 7
+  },
+  "PromotionAgent": {
+    "QuantityNearMissDelta": 1,
+    "CartTotalNearMissPercent": 20
   },
   "Cors": {
     "AllowedOrigins": ["https://your-frontend-domain.com"]

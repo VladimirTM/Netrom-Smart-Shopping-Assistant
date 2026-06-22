@@ -1,5 +1,5 @@
 import { Box, Button, Chip, Container, Grid, IconButton, Paper, Typography, useTheme } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 import CategoryIcon from "@mui/icons-material/Category";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
@@ -73,41 +73,71 @@ const features = [
   },
 ];
 
-function BannerCarousel({ banners }: { banners: Banner[] }) {
+type HeroSlide = {
+  key: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+  linkTo: string | null;
+  isStatic: boolean;
+};
+
+const STATIC_SLIDE: HeroSlide = {
+  key: "static",
+  title: "Shop Smarter,\nSave Automatically",
+  subtitle: "Discover thousands of products and let our AI find the best promotions for your cart — automatically.",
+  linkTo: "/shop",
+  imageUrl: null,
+  isStatic: true,
+};
+
+function HeroSection({ banners }: { banners: Banner[] }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const slides: HeroSlide[] = banners.length > 0
+    ? banners.map((b) => ({ key: String(b.id), title: b.title, subtitle: b.subtitle, imageUrl: b.imageUrl, linkTo: b.linkTo, isStatic: false }))
+    : [STATIC_SLIDE];
   const [current, setCurrent] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (banners.length <= 1) return;
-    let id: ReturnType<typeof setInterval>;
+    if (slides.length <= 1) return;
 
     function start() {
-      id = setInterval(() => setCurrent((i) => (i + 1) % banners.length), 5000);
+      intervalRef.current = setInterval(() => setCurrent((i) => (i + 1) % slides.length), 5000);
+    }
+    function stop() {
+      if (intervalRef.current !== null) clearInterval(intervalRef.current);
     }
     function handleVisibility() {
-      clearInterval(id);
+      stop();
       if (document.visibilityState === "visible") start();
     }
 
     start();
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      clearInterval(id);
+      stop();
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [banners.length]);
+  }, [slides.length]);
 
-  const prev = () => setCurrent((i) => (i - 1 + banners.length) % banners.length);
-  const next = () => setCurrent((i) => (i + 1) % banners.length);
+  const prev = () => {
+    setCurrent((i) => (i - 1 + slides.length) % slides.length);
+    if (intervalRef.current !== null) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => setCurrent((i) => (i + 1) % slides.length), 5000);
+  };
+  const next = () => {
+    setCurrent((i) => (i + 1) % slides.length);
+    if (intervalRef.current !== null) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => setCurrent((i) => (i + 1) % slides.length), 5000);
+  };
 
   return (
-    <Box sx={{ position: "relative", overflow: "hidden", height: { xs: 300, sm: 400, md: 520 } }}>
-      {banners.map((banner, i) => (
+    <Box sx={{ position: "relative", overflow: "hidden", height: { xs: 340, sm: 420, md: 540 } }}>
+      {slides.map((slide, i) => (
         <Box
-          key={banner.id}
-          component={banner.linkTo ? "a" : "div"}
-          href={banner.linkTo ?? undefined}
+          key={slide.key}
           sx={{
             position: "absolute",
             inset: 0,
@@ -120,9 +150,8 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
             opacity: i === current ? 1 : 0,
             transform: i === current ? "scale(1)" : "scale(1.03)",
             zIndex: i === current ? 1 : 0,
-            cursor: banner.linkTo ? "pointer" : "default",
-            ...(banner.imageUrl
-              ? { background: `url(${banner.imageUrl}) center/cover no-repeat` }
+            ...(slide.imageUrl
+              ? { background: `url(${slide.imageUrl}) center/cover no-repeat` }
               : {
                   background: isDark
                     ? "linear-gradient(135deg, #3a2e00 0%, #5a4800 50%, #6e5800 100%)"
@@ -134,9 +163,9 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
             sx={{
               position: "absolute",
               inset: 0,
-              background: banner.imageUrl
+              background: slide.imageUrl
                 ? "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.60) 50%, rgba(0,0,0,0.45) 100%)"
-                : "rgba(0,0,0,0.35)",
+                : "rgba(0,0,0,0.25)",
             }}
           />
           <Box
@@ -149,6 +178,13 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
               color: "#fff",
             }}
           >
+            {slide.isStatic && (
+              <Chip
+                label="AI-Powered Shopping"
+                icon={<SmartToyIcon style={{ color: "#fff" }} />}
+                sx={{ mb: 3, bgcolor: "rgba(255,255,255,0.15)", color: "#fff", fontWeight: 600 }}
+              />
+            )}
             <Typography
               variant="h2"
               sx={{
@@ -158,48 +194,53 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
                 lineHeight: 1.1,
                 textShadow: "0 4px 24px rgba(0,0,0,0.7), 0 1px 0 rgba(0,0,0,0.5)",
                 letterSpacing: "-0.5px",
+                whiteSpace: "pre-line",
               }}
             >
-              {banner.title}
+              {slide.title}
             </Typography>
-            {banner.subtitle && (
+            {slide.subtitle && (
               <Typography
                 variant="h6"
                 sx={{
                   fontWeight: 500,
-                  opacity: 1,
-                  mb: banner.linkTo ? 3 : 0,
+                  mb: 3,
                   textShadow: "0 2px 12px rgba(0,0,0,0.65)",
-                  fontSize: { xs: "1.05rem", md: "1.35rem" },
+                  fontSize: { xs: "1.05rem", md: "1.25rem" },
+                  opacity: 0.92,
+                  maxWidth: 560,
+                  mx: "auto",
                 }}
               >
-                {banner.subtitle}
+                {slide.subtitle}
               </Typography>
             )}
-            {banner.linkTo && (
-              <Button
-                variant="contained"
-                size="large"
-                sx={{
-                  bgcolor: "#fff",
-                  color: "primary.dark",
-                  fontWeight: 700,
-                  px: 5,
-                  borderRadius: 3,
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
-                  "&:hover": { bgcolor: isDark ? "rgba(255,255,255,0.88)" : "#f5f0cc" },
-                }}
-              >
-                Shop Now
-              </Button>
-            )}
+            <Button
+              component={NavLink}
+              to={slide.linkTo ?? "/shop"}
+              variant="contained"
+              size="large"
+              startIcon={slide.isStatic ? <StorefrontIcon /> : undefined}
+              sx={{
+                bgcolor: "#fff",
+                color: "primary.dark",
+                fontWeight: 700,
+                px: 5,
+                borderRadius: 3,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+                "&:hover": { bgcolor: isDark ? "rgba(255,255,255,0.88)" : "#f5f0cc" },
+              }}
+            >
+              {slide.isStatic ? "Start Shopping" : "Shop Now"}
+            </Button>
           </Box>
         </Box>
       ))}
 
-      {banners.length > 1 && (
+      {slides.length > 1 && (
         <>
           <IconButton
+            aria-label="Previous slide"
             onClick={(e) => { e.preventDefault(); prev(); }}
             size="large"
             sx={{
@@ -217,6 +258,7 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
             <ChevronLeftIcon fontSize="large" />
           </IconButton>
           <IconButton
+            aria-label="Next slide"
             onClick={(e) => { e.preventDefault(); next(); }}
             size="large"
             sx={{
@@ -246,7 +288,7 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
               zIndex: 2,
             }}
           >
-            {banners.map((_, i) => (
+            {slides.map((_, i) => (
               <Box
                 key={i}
                 onClick={() => setCurrent(i)}
@@ -269,60 +311,6 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
   );
 }
 
-function StaticHero() {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  return (
-    <Box
-      sx={{
-        background: isDark
-          ? "linear-gradient(135deg, #3a2e00 0%, #5a4800 50%, #6e5800 100%)"
-          : "linear-gradient(135deg, #5a4a00 0%, #867000 50%, #a08800 100%)",
-        color: "#fff",
-        py: { xs: 8, md: 12 },
-        px: 3,
-        textAlign: "center",
-      }}
-    >
-      <Chip
-        label="AI-Powered Shopping"
-        icon={<SmartToyIcon style={{ color: "#fff" }} />}
-        sx={{ mb: 3, bgcolor: "rgba(255,255,255,0.15)", color: "#fff", fontWeight: 600 }}
-      />
-      <Typography
-        variant="h2"
-        sx={{ fontWeight: 800, mb: 2, fontSize: { xs: "2rem", md: "3rem" }, lineHeight: 1.2 }}
-      >
-        Shop Smarter,
-        <br />
-        Save Automatically
-      </Typography>
-      <Typography
-        variant="h6"
-        sx={{ mb: 4, opacity: 0.85, fontWeight: 400, maxWidth: 540, mx: "auto" }}
-      >
-        Discover thousands of products and let our AI find the best promotions for your cart — automatically.
-      </Typography>
-      <Button
-        component={NavLink}
-        to="/shop"
-        variant="contained"
-        size="large"
-        startIcon={<StorefrontIcon />}
-        sx={{
-          bgcolor: "#fff",
-          color: "primary.dark",
-          fontWeight: 700,
-          px: 5,
-          "&:hover": { bgcolor: isDark ? "rgba(255,255,255,0.85)" : "#f5f0cc" },
-        }}
-      >
-        Start Shopping
-      </Button>
-    </Box>
-  );
-}
-
 function UserHome() {
   const [activeBanners, setActiveBanners] = useState<Banner[]>([]);
 
@@ -335,11 +323,7 @@ function UserHome() {
 
   return (
     <Box>
-      {activeBanners.length > 0 ? (
-        <BannerCarousel banners={activeBanners} />
-      ) : (
-        <StaticHero />
-      )}
+      <HeroSection banners={activeBanners} />
 
       <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
         <Box

@@ -11,6 +11,7 @@ import {
   Container,
   Divider,
   IconButton,
+  TextField,
   Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -32,16 +33,18 @@ import { fmt } from "../../utils/currency";
 function ProductDetail() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
-  const { addItem } = useCart();
+  const { addItem, cart } = useCart();
   const { toggle: toggleWishlist, has: isWishlisted } = useWishlist();
   const { showToast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [qtyInput, setQtyInput] = useState("1");
 
   const id = Number(productId);
 
@@ -55,10 +58,24 @@ function ProductDetail() {
       .then(([prod, rel]) => {
         setProduct(prod);
         setRelated(rel);
+        setQuantity(1);
+        setQtyInput("1");
       })
       .catch((err) => setError((err as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Clamp selected quantity whenever in-cart stock changes
+  useEffect(() => {
+    if (!product) return;
+    const inCart = cart?.items.find((i) => i.productId === product.id)?.quantity ?? 0;
+    const avail = Math.max(0, product.stockQuantity - inCart);
+    setQuantity((prev) => {
+      const next = Math.min(prev, Math.max(1, avail));
+      if (next !== prev) setQtyInput(String(next));
+      return next;
+    });
+  }, [cart, product?.id, product?.stockQuantity]);
 
   if (loading) {
     return (
@@ -76,8 +93,19 @@ function ProductDetail() {
     );
   }
 
+  const cartQty = cart?.items.find((i) => i.productId === product.id)?.quantity ?? 0;
+  const effectiveStock = Math.max(0, product.stockQuantity - cartQty);
   const outOfStock = product.stockQuantity === 0;
-  const lowStock = product.stockQuantity > 0 && product.stockQuantity < 5;
+  const maxInCart = !outOfStock && effectiveStock === 0;
+  const lowStock = effectiveStock > 0 && effectiveStock < 5;
+
+  function commitQtyInput() {
+    const parsed = parseInt(qtyInput, 10);
+    if (isNaN(parsed) || parsed < 1) { setQtyInput(String(quantity)); return; }
+    const clamped = Math.min(parsed, effectiveStock);
+    setQuantity(clamped);
+    setQtyInput(String(clamped));
+  }
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -110,21 +138,23 @@ function ProductDetail() {
             <Typography variant="h4" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
               {product.name}
             </Typography>
-            <IconButton
-              onClick={() => {
-                if (!isAuthenticated) { navigate("/login"); return; }
-                const wasWishlisted = isWishlisted(product.id);
-                void toggleWishlist(product.id);
-                showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
-              }}
-              sx={{ flexShrink: 0 }}
-            >
-              {isWishlisted(product.id) ? (
-                <FavoriteIcon color="error" />
-              ) : (
-                <FavoriteBorderIcon />
-              )}
-            </IconButton>
+            {!isAdmin && (
+              <IconButton
+                onClick={() => {
+                  if (!isAuthenticated) { navigate("/login"); return; }
+                  const wasWishlisted = isWishlisted(product.id);
+                  void toggleWishlist(product.id);
+                  showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+                }}
+                sx={{ flexShrink: 0 }}
+              >
+                {isWishlisted(product.id) ? (
+                  <FavoriteIcon color="error" />
+                ) : (
+                  <FavoriteBorderIcon />
+                )}
+              </IconButton>
+            )}
           </Box>
 
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1.5 }}>
@@ -146,12 +176,15 @@ function ProductDetail() {
           {outOfStock && (
             <Chip label="Out of Stock" color="error" sx={{ mt: 1 }} />
           )}
-          {lowStock && (
-            <Chip label={`Only ${product.stockQuantity} left`} color="warning" sx={{ mt: 1 }} />
+          {maxInCart && (
+            <Chip label="You have all available stock in your cart" color="warning" sx={{ mt: 1 }} />
           )}
-          {!outOfStock && !lowStock && (
+          {lowStock && (
+            <Chip label={`Only ${effectiveStock} more available`} color="warning" sx={{ mt: 1 }} />
+          )}
+          {!outOfStock && !maxInCart && !lowStock && (
             <Typography variant="body2" color="success.main" sx={{ mt: 1, fontWeight: 500 }}>
-              In stock ({product.stockQuantity} available)
+              In stock ({effectiveStock} available)
             </Typography>
           )}
 
@@ -164,7 +197,7 @@ function ProductDetail() {
           <Divider sx={{ my: 2 }} />
 
           {/* Quantity + Add to Cart */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {!isAdmin && <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Box
               sx={{
                 display: "flex",
@@ -176,18 +209,44 @@ function ProductDetail() {
             >
               <IconButton
                 size="small"
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                onClick={() => {
+                  const next = Math.max(1, quantity - 1);
+                  setQuantity(next);
+                  setQtyInput(String(next));
+                }}
                 disabled={quantity <= 1}
               >
                 <RemoveIcon fontSize="small" />
               </IconButton>
-              <Typography sx={{ mx: 2, minWidth: 24, textAlign: "center", fontWeight: 600 }}>
-                {quantity}
-              </Typography>
+              <TextField
+                size="small"
+                type="number"
+                value={qtyInput}
+                onChange={(e) => setQtyInput(e.target.value)}
+                onBlur={commitQtyInput}
+                onKeyDown={(e) => { if (e.key === "Enter") commitQtyInput(); }}
+                slotProps={{
+                  htmlInput: {
+                    min: 1,
+                    max: effectiveStock,
+                    style: { textAlign: "center", padding: "4px 2px" },
+                  },
+                }}
+                sx={{
+                  width: 64,
+                  mx: 0.5,
+                  "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": { display: "none" },
+                  "& input[type=number]": { MozAppearance: "textfield" },
+                }}
+              />
               <IconButton
                 size="small"
-                onClick={() => setQuantity((q) => Math.min(product.stockQuantity, q + 1))}
-                disabled={outOfStock || quantity >= product.stockQuantity}
+                onClick={() => {
+                  const next = Math.min(effectiveStock, quantity + 1);
+                  setQuantity(next);
+                  setQtyInput(String(next));
+                }}
+                disabled={outOfStock || maxInCart || quantity >= effectiveStock}
               >
                 <AddIcon fontSize="small" />
               </IconButton>
@@ -196,11 +255,16 @@ function ProductDetail() {
               variant="contained"
               size="large"
               startIcon={<AddShoppingCartIcon />}
-              disabled={outOfStock}
+              disabled={outOfStock || maxInCart}
               onClick={async () => {
                 if (!isAuthenticated) { navigate("/login"); return; }
+                const parsed = parseInt(qtyInput, 10);
+                const qtyToAdd = (!isNaN(parsed) && parsed >= 1)
+                  ? Math.min(parsed, effectiveStock)
+                  : quantity;
+                commitQtyInput();
                 try {
-                  await addItem(product.id, quantity);
+                  await addItem(product.id, qtyToAdd);
                   showToast(`${product.name} added to cart`);
                 } catch {
                   showToast("Failed to add item to cart.", "error");
@@ -208,9 +272,9 @@ function ProductDetail() {
               }}
               sx={{ flexGrow: 1 }}
             >
-              {outOfStock ? "Out of Stock" : "Add to Cart"}
+              {outOfStock ? "Out of Stock" : maxInCart ? "Max in Cart" : "Add to Cart"}
             </Button>
-          </Box>
+          </Box>}
         </Box>
       </Box>
 
@@ -260,27 +324,29 @@ function ProductDetail() {
                     {fmt(rel.price)}
                   </Typography>
                 </CardContent>
-                <CardActions sx={{ pt: 0, px: 1.5, pb: 1.5 }}>
-                  <Button
-                    fullWidth
-                    size="small"
-                    variant="outlined"
-                    startIcon={<AddShoppingCartIcon fontSize="small" />}
-                    disabled={rel.stockQuantity === 0}
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!isAuthenticated) { navigate("/login"); return; }
-                      try {
-                        await addItem(rel.id, 1);
-                        showToast(`${rel.name} added to cart`);
-                      } catch {
-                        showToast("Failed to add item to cart.", "error");
-                      }
-                    }}
-                  >
-                    {rel.stockQuantity === 0 ? "Out of Stock" : "Add to Cart"}
-                  </Button>
-                </CardActions>
+                {!isAdmin && (
+                  <CardActions sx={{ pt: 0, px: 1.5, pb: 1.5 }}>
+                    <Button
+                      fullWidth
+                      size="small"
+                      variant="outlined"
+                      startIcon={<AddShoppingCartIcon fontSize="small" />}
+                      disabled={rel.stockQuantity === 0}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!isAuthenticated) { navigate("/login"); return; }
+                        try {
+                          await addItem(rel.id, 1);
+                          showToast(`${rel.name} added to cart`);
+                        } catch {
+                          showToast("Failed to add item to cart.", "error");
+                        }
+                      }}
+                    >
+                      {rel.stockQuantity === 0 ? "Out of Stock" : "Add to Cart"}
+                    </Button>
+                  </CardActions>
+                )}
               </Card>
             ))}
           </Box>

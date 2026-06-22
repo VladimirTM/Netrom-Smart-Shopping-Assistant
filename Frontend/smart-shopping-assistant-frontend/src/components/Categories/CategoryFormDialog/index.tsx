@@ -39,7 +39,7 @@ function CategoryFormDialog({
     setSaving(true);
     setError("");
     try {
-      const data = { name, description };
+      const data = { name: name.trim(), description: description.trim() || undefined };
       if (isEditing) {
         await categoriesApi.update(category.id, data);
       } else {

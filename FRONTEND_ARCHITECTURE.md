@@ -15,7 +15,7 @@
    - 4.2 [Cart Context](#42-cart-context)
    - 4.3 [Wishlist Context](#43-wishlist-context)
    - 4.4 [Theme Context](#44-theme-context)
-   - 4.5 [Role Context (Legacy)](#45-role-context-legacy)
+   - 4.5 [Role Context (Removed)](#45-role-context-removed)
    - 4.6 [Toast Context](#46-toast-context)
 5. [Application Shell & Routing](#5-application-shell--routing)
 6. [NavBar](#6-navbar)
@@ -46,7 +46,8 @@
     - 20.3 [Promotions](#203-promotions)
     - 20.4 [Banners](#204-banners)
     - 20.5 [Analytics Dashboard](#205-analytics-dashboard)
-    - 20.6 [Activity Log Component](#206-activity-log-component)
+    - 20.6 [Activity Log Component (Embedded Widget)](#206-activity-log-component-embedded-widget)
+    - 20.7 [Activity Log Page (Standalone)](#207-activity-log-page-standalone)
 21. [Shared / Common Components](#21-shared--common-components)
 22. [End-to-End Data Flow](#22-end-to-end-data-flow)
 23. [Key Design Decisions](#23-key-design-decisions)
@@ -95,9 +96,6 @@ src/
 │   ├── CartContent/
 │   │   ├── cart-context.ts           # Context object + useCart hook
 │   │   └── CartProvider.tsx          # Auth-aware cart state + API orchestration
-│   ├── RoleContext/                  # Legacy dev-only role toggle (not used for real auth)
-│   │   ├── role-context.ts
-│   │   └── RoleProvider.tsx
 │   ├── ThemeContext/
 │   │   ├── theme-context.ts          # ThemeContextValue + useThemeMode() hook
 │   │   └── AppThemeProvider.tsx      # Dark/light mode toggle, localStorage persistence
@@ -120,7 +118,8 @@ src/
     │       ├── Category.ts
     │       ├── Product.ts            # Includes stockQuantity
     │       └── Promotion.ts
-    ├── ActivityLog/index.tsx         # Activity log feed card (auto-refreshes every 60s)
+    ├── ActivityLog/index.tsx         # Embedded feed card for AdminHome (auto-refreshes every 60s)
+    ├── ActivityLogPage/index.tsx     # /activity-log — standalone admin page with pagination + manual refresh
     ├── Analytics/index.tsx           # /analytics — stat cards + top products + promotions tables
     ├── Banners/
     │   ├── index.tsx                 # /banners — CRUD table
@@ -546,13 +545,9 @@ function AppThemeProvider({ children }: { children: ReactNode }) {
 
 ---
 
-### 4.5 Role Context (Legacy)
+### 4.5 Role Context (Removed)
 
-**Files:** `src/context/RoleContext/role-context.ts` + `RoleProvider.tsx`
-
-> **Note:** `RoleContext` is no longer used for real authentication. The app uses `AuthContext` for JWT-based auth. `RoleProvider` and its files remain in the codebase but are not mounted in `App.tsx` and are not used by any active component. Real role checks go through `useAuth().user?.role`.
-
-The files are kept to avoid breaking any experimental code that may reference them, but can be safely deleted in a future cleanup.
+`RoleContext` was a dev-only role-toggle used before real JWT authentication was implemented. It has been fully deleted — `role-context.ts` and `RoleProvider.tsx` no longer exist. All role checks go through `useAuth().user?.role`.
 
 ---
 
@@ -636,6 +631,7 @@ function AppRoutes() {
         <Route path="/banners"           element={<AdminRoute><Banners /></AdminRoute>} />
         <Route path="/analytics"         element={<AdminRoute><Analytics /></AdminRoute>} />
         <Route path="/manage-orders"     element={<AdminRoute><ManageOrders /></AdminRoute>} />
+        <Route path="/activity-log"      element={<AdminRoute><ActivityLogPage /></AdminRoute>} />
         <Route path="*"                  element={<NotFound />} />
       </Routes>
       <CartDrawer />
@@ -669,6 +665,18 @@ function App() {
 | `ProtectedRoute` | Returns `null` while auth is loading; redirects unauthenticated users to `/login` |
 | `PublicOnlyRoute` | Returns `null` while loading; redirects already-authenticated users to `/` |
 | `AdminRoute` | Returns `null` while loading; redirects unauthenticated to `/login`; redirects non-admin to `/` |
+
+### Admin routes summary
+
+| Path | Component | Notes |
+|------|-----------|-------|
+| `/categories` | `Categories` | CRUD table |
+| `/products` | `Products` | CRUD table |
+| `/promotions` | `Promotions` | CRUD table |
+| `/banners` | `Banners` | CRUD table |
+| `/analytics` | `Analytics` | Read-only dashboard |
+| `/manage-orders` | `ManageOrders` | Order status management |
+| `/activity-log` | `ActivityLogPage` | Paginated event log |
 
 All guards read `loading` from `useAuth()` and render nothing (`null`) until the initial `/auth/me` call resolves. This prevents the auth flicker where a user with a stored token is briefly seen as unauthenticated on page load. All redirects use `replace` so the back button doesn't loop.
 
@@ -732,6 +740,8 @@ These items close the menu and navigate directly. The `Divider` between them and
     <Button component={NavLink} to="/banners"       sx={navButtonSx}>Banners</Button>
     <Button component={NavLink} to="/analytics"     sx={navButtonSx}>Analytics</Button>
     <Button component={NavLink} to="/manage-orders" sx={navButtonSx}>Orders</Button>
+    <Button component={NavLink} to="/activity-log"  sx={navButtonSx}>Activity</Button>
+    <Button component={NavLink} to="/shop"          sx={navButtonSx}>View Shop</Button>
   </>
 ) : (
   <Button component={NavLink} to="/shop" sx={navButtonSx}>Shop</Button>
@@ -930,6 +940,8 @@ All filtering is done **client-side** — products are fetched once on mount and
 
 Each product card shows a `FavoriteIcon` / `FavoriteBorderIcon` heart button that calls `toggle(product.id)` from `useWishlist()`. When `stockQuantity === 0`, the "Add to Cart" button is disabled and an "Out of stock" chip is shown. When `0 < stockQuantity < 5`, a "Low stock" amber chip appears. Clicking a product name or image navigates to `/shop/:productId`.
 
+The "Add to Cart" button is also disabled when the quantity already in the cart for that product meets or exceeds `stockQuantity` — this is computed from `cart` (pulled from `useCart()`) by looking up the product's cart item: `cartQty >= product.stockQuantity && product.stockQuantity > 0`. In that state the button label changes to "Max in Cart" and a hover tooltip explains the limit. The cart is always the source of truth here — it updates reactively whenever `CartProvider` receives a fresh cart from the server.
+
 ### Category toggle
 
 ```ts
@@ -959,27 +971,36 @@ If the `imageUrl` is broken or empty, the image is replaced with a grey placehol
 
 ```tsx
 const [addingId, setAddingId] = useState<number | null>(null);
+const { addItem, cart } = useCart();
 
-<Button
-  disabled={addingId === product.id}
-  startIcon={addingId === product.id ? <CircularProgress size={14} color="inherit" /> : <AddShoppingCartIcon />}
-  onClick={async () => {
-    if (!isAuthenticated) { navigate("/login"); return; }
-    if (addingId !== null) return;
-    setAddingId(product.id);
-    try {
-      await addItem(product.id, 1);
-      showToast(`${product.name} added to cart`);
-    } catch {
-      showToast("Failed to add to cart.", "error");
-    } finally {
-      setAddingId(null);
-    }
-  }}
->Add to Cart</Button>
+// per card:
+const cartQty = cart?.items.find((i) => i.productId === product.id)?.quantity ?? 0;
+const atStockLimit = cartQty >= product.stockQuantity && product.stockQuantity > 0;
+const outOfStock = product.stockQuantity === 0;
+const label = outOfStock ? "Out of Stock" : atStockLimit ? "Max in Cart" : "Add to Cart";
+
+<Tooltip title={atStockLimit ? `You already have all ${product.stockQuantity} in stock in your cart` : ""} disableHoverListener={!atStockLimit}>
+  <span style={{ width: "100%" }}>
+    <Button
+      disabled={outOfStock || atStockLimit || addingId === product.id}
+      startIcon={addingId === product.id ? <CircularProgress size={14} color="inherit" /> : <AddShoppingCartIcon />}
+      onClick={async () => {
+        if (!isAuthenticated) { navigate("/login"); return; }
+        if (addingId !== null) return;
+        setAddingId(product.id);
+        try {
+          await addItem(product.id, 1);
+          showToast(`${product.name} added to cart`);
+        } finally {
+          setAddingId(null);
+        }
+      }}
+    >{label}</Button>
+  </span>
+</Tooltip>
 ```
 
-Guards at multiple levels: (1) **Auth check** — unauthenticated users are redirected to `/login`. (2) **Lock guard** — if another add is already in progress (`addingId !== null`), the click is ignored. (3) **Per-card loading** — `addingId` tracks which specific product is loading, disabling its button and swapping the icon for a `CircularProgress`. Toast feedback fires on success or failure via `useToast()`. After the API round-trip, `CartProvider` updates `cart` state and the NavBar badge re-renders automatically.
+Guards at multiple levels: (1) **Auth check** — unauthenticated users are redirected to `/login`. (2) **Stock limit** — the button is disabled and shows "Max in Cart" when `cartQty >= stockQuantity`. (3) **Out of stock** — disabled with "Out of Stock" label when `stockQuantity === 0`. (4) **Lock guard** — if another add is already in progress (`addingId !== null`), the click is ignored. (5) **Per-card loading** — `addingId` tracks which specific product is loading, swapping the icon for a `CircularProgress`. Toast feedback fires on success via `useToast()`. The `<span>` wrapper is required for `Tooltip` to work on a disabled MUI `Button` (disabled elements don't fire mouse events).
 
 ### Category pre-selection from URL
 
@@ -1046,22 +1067,80 @@ useEffect(() => {
   ]).then(([prod, related]) => {
     setProduct(prod);
     setRelatedProducts(related);
-  }).catch(() => navigate("/shop"));
-}, [productId]);
+    setQuantity(1);    // reset on product navigation
+    setQtyInput("1");  // reset string state too
+  }).catch((err) => setError((err as Error).message));
+}, [id]);
 ```
 
-Both the product and its related products are fetched in parallel. If the product is not found (404), the catch block navigates back to `/shop`.
+Both the product and its related products are fetched in parallel. `quantity` and `qtyInput` are explicitly reset to `1` on each product load — without this, navigating from a related product card would carry the previously selected quantity into the new product page.
+
+### Cart-aware effective stock
+
+The page pulls `cart` from `useCart()` and computes an **effective stock** that accounts for units already in the cart:
+
+```ts
+const cartQty = cart?.items.find((i) => i.productId === product.id)?.quantity ?? 0;
+const effectiveStock = Math.max(0, product.stockQuantity - cartQty);
+const outOfStock  = product.stockQuantity === 0;
+const maxInCart   = !outOfStock && effectiveStock === 0;
+const lowStock    = effectiveStock > 0 && effectiveStock < 5;
+```
+
+`effectiveStock` is used everywhere that previously used `product.stockQuantity` — the quantity selector max, the `+` button guard, the stock chips, and the commit clamp. This means adding a product to the cart from the Shop page immediately reduces the "available" count shown on the detail page.
+
+A dedicated `useEffect` reactively clamps the currently selected quantity whenever `cart` or the product changes:
+
+```ts
+useEffect(() => {
+  if (!product) return;
+  const inCart = cart?.items.find((i) => i.productId === product.id)?.quantity ?? 0;
+  const avail  = Math.max(0, product.stockQuantity - inCart);
+  setQuantity((prev) => {
+    const next = Math.min(prev, Math.max(1, avail));
+    if (next !== prev) setQtyInput(String(next));
+    return next;
+  });
+}, [cart, product?.id, product?.stockQuantity]);
+```
 
 ### Stock indicators
 
-The page reads `product.stockQuantity` to drive the same stock UI as the Shop page:
-- `stockQuantity === 0` — "Out of stock" chip, "Add to Cart" button disabled
-- `0 < stockQuantity < 5` — "Low stock: N left" amber chip
-- `stockQuantity >= 5` — no chip shown
+Stock chips and text are driven by `effectiveStock` (not `product.stockQuantity`):
+
+| Condition | Display |
+|-----------|---------|
+| `stockQuantity === 0` | "Out of Stock" error chip |
+| `stockQuantity > 0 && effectiveStock === 0` | "You have all available stock in your cart" warning chip |
+| `0 < effectiveStock < 5` | "Only N more available" warning chip |
+| `effectiveStock >= 5` | "In stock (N available)" success text |
+
+### Quantity selector
+
+Three ways to change the quantity, all clamped to `[1, effectiveStock]`:
+
+1. **`−` button** — decrements by 1, disabled at `quantity === 1`
+2. **`+` button** — increments by 1, disabled at `quantity === effectiveStock` (or when `maxInCart`)
+3. **`TextField`** — direct numeric entry; committed on blur or Enter; invalid or out-of-range values are clamped silently
+
+```tsx
+const [quantity, setQuantity] = useState(1);
+const [qtyInput, setQtyInput] = useState("1");
+
+function commitQtyInput() {
+  const parsed = parseInt(qtyInput, 10);
+  if (isNaN(parsed) || parsed < 1) { setQtyInput(String(quantity)); return; }
+  const clamped = Math.min(parsed, effectiveStock);
+  setQuantity(clamped);
+  setQtyInput(String(clamped));
+}
+```
+
+Button clicks update both `quantity` (the committed number) and `qtyInput` (the string shown in the field) in sync.
 
 ### Category chips with navigation
 
-Each category on the product is rendered as an MUI `Chip` with `onClick`. Clicking a category chip navigates to `/shop?categoryId=<id>`, which the Shop page reads from `useSearchParams()` to pre-select that category in the filter panel.
+Each category on the product is rendered as an MUI `Chip` with `onClick`. Clicking a category chip navigates to `/shop?category=<id>`, which the Shop page reads from `useSearchParams()` to pre-select that category in the filter panel.
 
 ### Related products
 
@@ -1089,7 +1168,7 @@ onClick={() => {
 
 ### Add to cart (ProductDetail)
 
-Like the Shop page, "Add to Cart" checks `isAuthenticated` before calling `addItem`. If the user is a guest, they are redirected to `/login`. On success a toast confirms the item was added; on failure a toast shows the error. The same auth + toast pattern also applies to the related products row's "Add to Cart" buttons.
+"Add to Cart" is disabled when `outOfStock || maxInCart` and the label changes accordingly (`"Out of Stock"` / `"Max in Cart"` / `"Add to Cart"`). Auth check redirects guests to `/login`. On success a toast confirms; on failure a toast shows the error. The same auth + toast pattern applies to the related products row's "Add to Cart" buttons (which add 1 unit and do not have a quantity picker).
 
 ---
 
@@ -1226,6 +1305,30 @@ When `cart === null` (initial load not yet complete) or `cart.items.length === 0
 ### Item list
 
 ```tsx
+// State for the editable quantity inputs (keyed by cart item ID)
+const [inputQty, setInputQty] = useState<Record<number, string>>({});
+
+// Sync input values whenever the cart updates from the server
+useEffect(() => {
+  if (!cart) return;
+  setInputQty(() => {
+    const next: Record<number, string> = {};
+    cart.items.forEach((item) => { next[item.id] = String(item.quantity); });
+    return next;
+  });
+}, [cart]);
+
+function commitQty(id: number, currentQty: number, maxQty: number) {
+  const parsed = parseInt(inputQty[id] ?? "", 10);
+  if (isNaN(parsed) || parsed < 1) {
+    setInputQty((prev) => ({ ...prev, [id]: String(currentQty) }));
+    return;
+  }
+  const clamped = Math.min(parsed, maxQty);
+  if (clamped !== currentQty) updateQuantity(id, clamped);
+  setInputQty((prev) => ({ ...prev, [id]: String(clamped) }));
+}
+
 {cart.items.map((item) => (
   <ListItem key={item.id} ...>
     {/* Product name + delete button */}
@@ -1241,7 +1344,16 @@ When `cart === null` (initial load not yet complete) or `cart.items.length === 0
     >
       <RemoveIcon />
     </IconButton>
-    <Typography>{item.quantity}</Typography>
+    <TextField
+      size="small"
+      type="number"
+      value={inputQty[item.id] ?? item.quantity}
+      onChange={(e) => setInputQty((prev) => ({ ...prev, [item.id]: e.target.value }))}
+      onBlur={() => commitQty(item.id, item.quantity, item.stockQuantity)}
+      onKeyDown={(e) => { if (e.key === "Enter") commitQty(item.id, item.quantity, item.stockQuantity); }}
+      slotProps={{ htmlInput: { min: 1, max: item.stockQuantity } }}
+      sx={{ width: 56 }}
+    />
     <IconButton
       onClick={() => updateQuantity(item.id, item.quantity + 1)}
       disabled={item.quantity >= item.stockQuantity}
@@ -1255,7 +1367,12 @@ When `cart === null` (initial load not yet complete) or `cart.items.length === 0
 ))}
 ```
 
-The `−` button is `disabled` when `quantity <= 1` — the minimum quantity for a cart item is 1. The `+` button is `disabled` when `quantity >= item.stockQuantity` — prevents the user from adding more units than are in stock. If the user wants to remove an item entirely, they use the delete button.
+**Quantity controls — three ways to change quantity:**
+1. `−` button: decrements by 1, disabled at `quantity === 1` (minimum)
+2. `+` button: increments by 1, disabled at `quantity === stockQuantity` (maximum)
+3. `TextField`: direct numeric input clamped to `[1, stockQuantity]`; the value is committed on blur or Enter — if the typed value is out of range it is clamped silently, if it is not a valid integer the field resets to the current server quantity.
+
+`inputQty` holds the pending string value for each input field. It is re-synced from the server cart on every cart update (the `useEffect` on `[cart]`). This means a server-side rejection or concurrent update will always win and reset the displayed value.
 
 `item.subtotal` is computed by the backend (price × quantity), not by the frontend.
 
@@ -1998,10 +2115,18 @@ No mapper — the response is used directly. The endpoint requires an admin JWT 
 ### Activity Log API Client (`api/clients/ActivityLogApiClient.ts`)
 
 ```ts
+interface ActivityLogPage {
+  logs: ActivityLogModel[];
+  total: number;
+}
+
 export const activityLogApi = {
-  getLatest: (limit = 50) => http.get<ActivityLogModel[]>(`/admin/activity-log?limit=${limit}`),
+  getPage:   (limit = 50, offset = 0) => http.get<ActivityLogPage>(`/admin/activity-log?limit=${limit}&offset=${offset}`),
+  getLatest: (limit = 50)             => http.get<ActivityLogPage>(`/admin/activity-log?limit=${limit}`).then((r) => r.logs),
 };
 ```
+
+`getPage` is used by `ActivityLogPage` for paginated browsing. `getLatest` is used by the embedded `ActivityLog` widget in `AdminHome` and remains backward-compatible (returns `ActivityLogModel[]` directly).
 
 ### Wishlist API Client (`api/clients/WishlistApiClient.ts`)
 
@@ -2239,11 +2364,11 @@ The `StatCard` is a local subcomponent (not exported) — it takes `icon`, `labe
 
 **Data source:** The backend `AnalyticsService` computes everything in SQL via EF Core `GroupBy` and `Sum` aggregations. Until orders are implemented (Group D), `promotionUsage.usageCount` is always `0` — the table still lists all active promotions as a useful overview.
 
-### 16.6 Activity Log Component
+### 20.6 Activity Log Component (Embedded Widget)
 
 **File:** `src/components/ActivityLog/index.tsx`
 
-A non-page component rendered at the bottom of `AdminHome`. It is not a route — it has no `/activity-log` path.
+A non-page component rendered at the bottom of `AdminHome`. It is not a route — it is an embedded feed card showing the most recent entries.
 
 **Auto-refresh:**
 ```ts
@@ -2253,7 +2378,7 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 ```
-Fetches on mount and every 60 seconds. The cleanup function in the `useEffect` return clears the interval when `AdminHome` unmounts, preventing memory leaks and stale updates.
+Fetches on mount and every 60 seconds via `activityLogApi.getLatest(30)`. The cleanup function clears the interval when `AdminHome` unmounts, preventing memory leaks.
 
 **Action formatting:**
 ```ts
@@ -2268,6 +2393,33 @@ function formatAction(log: ActivityLogModel): string {
 This converts `"CategoryUpdated"` + `entityType = "Category"` + `entityName = "Electronics"` → `Category "Electronics" updated`.
 
 **Entity icons:** A `Record<string, ReactNode>` maps `"Category"`, `"Product"`, `"Promotion"`, and `"Banner"` to their respective MUI icons. Unknown entity types fall back to `HistoryIcon`.
+
+### 20.7 Activity Log Page (Standalone)
+
+**File:** `src/components/ActivityLogPage/index.tsx`  
+**Route:** `/activity-log` (admin only)
+
+A dedicated admin page for browsing the full activity log with server-side pagination.
+
+**State:**
+```ts
+const [logs, setLogs]       = useState<ActivityLogModel[]>([]);
+const [total, setTotal]     = useState(0);
+const [page, setPage]       = useState(1);
+const [loading, setLoading] = useState(true);
+const [refreshing, setRefreshing] = useState(false);
+const mountedRef            = useRef(true);
+```
+
+`PAGE_SIZE = 25` entries per page. `fetchPage(p, silent)` calls `activityLogApi.getPage(25, (p-1)*25)`. When `silent = true` (manual refresh button), only `refreshing` is set — the existing list stays visible rather than being replaced by a spinner.
+
+**Mounted ref:** `mountedRef` guards against setting state after the component unmounts during an in-flight fetch. It is set to `false` in the `useEffect` cleanup.
+
+**Pagination:** MUI `Pagination` component with `count = Math.ceil(total / PAGE_SIZE)`. Changing the page calls `setPage(p)`, which triggers the `useEffect` dependency to re-fetch.
+
+**Manual refresh:** A `RefreshIcon` `IconButton` in the header calls `fetchPage(page, true)` without changing the page, re-fetching the current page silently.
+
+The page displays `total` event count at the bottom as a caption.
 
 ---
 

@@ -11,7 +11,8 @@ Built as part of the **Liga AC** program at Netrom.
 ### Customer
 - Browse and filter products by category, price, promotions, and stock availability
 - Semantic AI product search powered by OpenAI
-- Add products to a persistent, user-scoped cart
+- Add products to a persistent, user-scoped cart; "Add to Cart" is disabled once the in-cart quantity reaches available stock
+- Adjust cart item quantities via direct numeric input or ±1 buttons, clamped to [1, stockQuantity]
 - AI cart analysis: detects active promotions and near-miss deals, suggests products to unlock savings
 - Wishlist (server-persisted per user, survives across devices and browser sessions)
 - Checkout with shipping details and order placement
@@ -23,13 +24,15 @@ Built as part of the **Liga AC** program at Netrom.
 - Full CRUD for Products, Categories, Promotions, and Banners
 - Manage orders across all users and update order status
 - Analytics dashboard: revenue, order counts, top products, promotion usage
-- Real-time activity log feed
+- Real-time activity log feed (embedded widget in admin home + dedicated paginated page at `/activity-log`)
 
 ### Security
-- JWT authentication (HS256, 7-day expiry)
+- JWT authentication (HS256, 7-day expiry); key length enforced ≥ 32 chars on startup
 - BCrypt password hashing
 - Role-based authorization (`user` / `admin`)
 - Rate limiting on auth endpoints (10 req/min per IP)
+- Security headers on every response (X-Content-Type-Options, X-Frame-Options, Referrer-Policy; HSTS + CSP in production)
+- Server-side stock validation on cart mutations (prevents over-ordering)
 
 ---
 
@@ -177,7 +180,7 @@ The dev server starts at `http://localhost:5173` and points to the backend at `h
 | Wishlist | — | GET/POST/DELETE `/api/wishlist/{productId}` | — |
 | Orders | — | POST/GET `/api/orders` | GET/PUT `/api/admin/orders` |
 | Analytics | — | — | GET `/api/analytics/summary` |
-| Activity Log | — | — | GET `/api/admin/activity-log` |
+| Activity Log | — | — | GET `/api/admin/activity-log?limit=&offset=` |
 | AI Search | POST `/api/ai/search` | — | — |
 
 ---
