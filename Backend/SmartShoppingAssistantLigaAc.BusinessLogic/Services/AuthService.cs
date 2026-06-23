@@ -61,6 +61,7 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
         if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
             throw new UnauthorizedAccessException("Current password is incorrect.");
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.SecurityStamp = Guid.NewGuid().ToString();
         await userRepository.UpdateAsync(user);
     }
 
@@ -77,6 +78,7 @@ public class AuthService(IUserRepository userRepository, IConfiguration configur
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Role, user.Role),
+            new Claim("security_stamp", user.SecurityStamp),
         };
 
         var expiresDays = int.TryParse(configuration["Jwt:ExpiresInDays"], out var d) ? d : 7;

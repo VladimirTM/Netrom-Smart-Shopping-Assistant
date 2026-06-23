@@ -16,6 +16,7 @@ public class OrderRepository(SmartShoppingAssistantDbContext context) : IOrderRe
     {
         return await context.Orders
             .Include(o => o.Items)
+            .Include(o => o.AppliedPromotions).ThenInclude(ap => ap.Promotion)
             .Where(o => o.UserId == userId)
             .OrderByDescending(o => o.PlacedAt)
             .ToListAsync();
@@ -25,6 +26,7 @@ public class OrderRepository(SmartShoppingAssistantDbContext context) : IOrderRe
     {
         return await context.Orders
             .Include(o => o.Items)
+            .Include(o => o.AppliedPromotions).ThenInclude(ap => ap.Promotion)
             .Include(o => o.User)
             .OrderByDescending(o => o.PlacedAt)
             .ToListAsync();
@@ -34,6 +36,7 @@ public class OrderRepository(SmartShoppingAssistantDbContext context) : IOrderRe
     {
         return await context.Orders
             .Include(o => o.Items)
+            .Include(o => o.AppliedPromotions).ThenInclude(ap => ap.Promotion)
             .Include(o => o.User)
             .FirstOrDefaultAsync(o => o.Id == id);
     }

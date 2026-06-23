@@ -113,6 +113,30 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userIdClaim = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var tokenStamp = context.Principal?.FindFirst("security_stamp")?.Value;
+                if (userIdClaim == null || tokenStamp == null || !int.TryParse(userIdClaim, out var userId))
+                {
+                    context.Fail("Invalid token.");
+                    return;
+                }
+                var userRepo = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+                try
+                {
+                    var user = await userRepo.GetByIdAsync(userId);
+                    if (user.SecurityStamp != tokenStamp)
+                        context.Fail("Token has been invalidated.");
+                }
+                catch
+                {
+                    context.Fail("User not found.");
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
@@ -155,6 +179,21 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+app.UseExceptionHandler(errApp =>
+{
+    errApp.Run(async ctx =>
+    {
+        var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var ex = feature?.Error;
+        var logger = ctx.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Unhandled exception for {Method} {Path}", ctx.Request.Method, ctx.Request.Path);
+
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred." });
+    });
+});
 
 if (app.Environment.IsDevelopment())
 {

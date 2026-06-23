@@ -29,19 +29,22 @@ public class PromotionController(IPromotionService promotionService, IActivityLo
         {
             return NotFound(ex.Message);
         }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
-        }
     }
 
     [HttpPost]
     [Authorize(Roles = "admin")]
     public async Task<ActionResult<PromotionGetDTO>> Create([FromBody] PromotionCreateDTO dto)
     {
-        var created = await promotionService.CreateAsync(dto);
-        await activityLogService.LogAsync("PromotionCreated", "Promotion", created.Id, created.Name, ActorId(), ActorEmail());
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        try
+        {
+            var created = await promotionService.CreateAsync(dto);
+            await activityLogService.LogAsync("PromotionCreated", "Promotion", created.Id, created.Name, ActorId(), ActorEmail());
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPut("{id}")]
@@ -58,9 +61,9 @@ public class PromotionController(IPromotionService promotionService, IActivityLo
         {
             return NotFound(ex.Message);
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+            return BadRequest(ex.Message);
         }
     }
 
@@ -78,10 +81,6 @@ public class PromotionController(IPromotionService promotionService, IActivityLo
         catch (KeyNotFoundException ex)
         {
             return NotFound(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
         }
     }
 

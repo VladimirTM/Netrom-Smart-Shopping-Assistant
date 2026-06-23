@@ -109,6 +109,12 @@ public class OrderService(
                 Price = i.Price,
                 Quantity = i.Quantity,
                 Subtotal = i.Subtotal
+            }).ToList(),
+            AppliedPromotions = o.AppliedPromotions.Select(ap => new OrderAppliedPromotionGetDTO
+            {
+                PromotionId = ap.PromotionId,
+                PromotionName = ap.Promotion?.Name ?? "Deleted Promotion",
+                Discount = ap.Discount
             }).ToList()
         }).ToList();
     }
@@ -119,7 +125,46 @@ public class OrderService(
     {
         if (!AllowedStatuses.Contains(status))
             throw new ArgumentException($"Invalid status. Allowed: {string.Join(", ", AllowedStatuses)}");
-        await orderRepository.UpdateStatusAsync(id, status);
+
+        if (status != "Cancelled")
+        {
+            await orderRepository.UpdateStatusAsync(id, status);
+            return;
+        }
+
+        // Cancellation: restore stock atomically
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        try
+        {
+            var order = await dbContext.Orders
+                .Include(o => o.Items)
+                .FirstOrDefaultAsync(o => o.Id == id)
+                ?? throw new KeyNotFoundException($"Order {id} not found.");
+
+            if (order.Status == "Cancelled")
+                throw new InvalidOperationException("Order is already cancelled.");
+
+            var productIds = order.Items.Select(i => i.ProductId).ToList();
+            var products = await dbContext.Products
+                .Where(p => productIds.Contains(p.Id))
+                .ToListAsync();
+
+            foreach (var item in order.Items)
+            {
+                var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+                if (product is not null)
+                    product.StockQuantity += item.Quantity;
+            }
+
+            order.Status = "Cancelled";
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     private static OrderGetDTO MapToDTO(Order order) => new()
@@ -140,6 +185,12 @@ public class OrderService(
             Price = i.Price,
             Quantity = i.Quantity,
             Subtotal = i.Subtotal
+        }).ToList(),
+        AppliedPromotions = order.AppliedPromotions.Select(ap => new OrderAppliedPromotionGetDTO
+        {
+            PromotionId = ap.PromotionId,
+            PromotionName = ap.Promotion?.Name ?? "Deleted Promotion",
+            Discount = ap.Discount
         }).ToList()
     };
 }

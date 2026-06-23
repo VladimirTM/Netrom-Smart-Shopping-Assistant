@@ -11,9 +11,9 @@ namespace SmartShoppingAssistantLigaAc.Api.Controllers;
 public class ProductController(IProductService productService, IActivityLogService activityLogService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<ProductGetDTO>>> GetAll([FromQuery] int? categoryId = null)
+    public async Task<ActionResult<List<ProductGetDTO>>> GetAll([FromQuery] int? categoryId = null, [FromQuery] string? name = null)
     {
-        var products = await productService.GetAllAsync(categoryId);
+        var products = await productService.GetAllAsync(categoryId, name);
         return Ok(products);
     }
 

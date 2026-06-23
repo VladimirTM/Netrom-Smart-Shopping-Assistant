@@ -10,12 +10,15 @@ public class ProductService(
     IProductRepository productRepository,
     IRepository<Category> categoryRepository) : IProductService
 {
-    public async Task<List<ProductGetDTO>> GetAllAsync(int? categoryId = null)
+    public async Task<List<ProductGetDTO>> GetAllAsync(int? categoryId = null, string? name = null)
     {
         var products = await productRepository.GetAllWithCategoriesAsync();
 
         if (categoryId.HasValue)
             products = products.Where(p => p.Categories.Any(c => c.Id == categoryId.Value)).ToList();
+
+        if (!string.IsNullOrWhiteSpace(name))
+            products = products.Where(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase)).ToList();
 
         return products.Select(MapToDTO).ToList();
     }

@@ -4,7 +4,7 @@ namespace SmartShoppingAssistantLigaAc.BusinessLogic.Services.Interfaces;
 
 public interface IProductService
 {
-    Task<List<ProductGetDTO>> GetAllAsync(int? categoryId = null);
+    Task<List<ProductGetDTO>> GetAllAsync(int? categoryId = null, string? name = null);
     Task<ProductGetDTO> GetByIdAsync(int id);
     Task<List<ProductGetDTO>> GetByIdsAsync(IEnumerable<int> ids);
     Task<List<ProductGetDTO>> GetRelatedAsync(int productId);

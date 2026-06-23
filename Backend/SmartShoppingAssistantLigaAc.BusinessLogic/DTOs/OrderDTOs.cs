@@ -11,10 +11,18 @@ public class OrderItemGetDTO
     public decimal Subtotal { get; set; }
 }
 
+public class OrderAppliedPromotionGetDTO
+{
+    public int PromotionId { get; set; }
+    public string PromotionName { get; set; } = null!;
+    public decimal Discount { get; set; }
+}
+
 public class OrderGetDTO
 {
     public int Id { get; set; }
     public List<OrderItemGetDTO> Items { get; set; } = [];
+    public List<OrderAppliedPromotionGetDTO> AppliedPromotions { get; set; } = [];
     public decimal Total { get; set; }
     public string Status { get; set; } = null!;
     public DateTime PlacedAt { get; set; }
