@@ -104,7 +104,8 @@ src/
 │       └── WishlistProvider.tsx      # API-backed wishlist per authenticated user
 │
 ├── utils/
-│   └── currency.ts                   # fmt() — Intl.NumberFormat RON formatter
+│   ├── currency.ts                   # fmt() — Intl.NumberFormat RON formatter
+│   └── placeholder.ts                # placeholderImage(name) — inline SVG data URI for missing product images
 │
 └── components/
     ├── common/
@@ -473,8 +474,13 @@ function WishlistProvider({ children }: { children: ReactNode }) {
           ? await wishlistApi.removeItem(productId)
           : await wishlistApi.addItem(productId);
         setItems(new Set(data.productIds));   // server is source of truth
-      } catch {
-        // keep existing state on error
+      } catch (err) {
+        // Re-sync with server state so the local Set doesn't diverge
+        try {
+          const fresh = await wishlistApi.getWishlist();
+          setItems(new Set(fresh.productIds));
+        } catch { /* leave state as-is; next page load will re-fetch */ }
+        throw err;   // re-throw so callers can show an error toast
       }
     },
     [items]
@@ -489,9 +495,9 @@ function WishlistProvider({ children }: { children: ReactNode }) {
 
 - The wishlist is **server-persisted** via `GET/POST/DELETE /api/wishlist`. `localStorage` is no longer used.
 - `useEffect` depends on `isAuthenticated`. On login it fetches the user's saved wishlist; on logout it resets to an empty set.
-- `toggle` is now `async` — it calls the API and updates state from the server response so the UI is always in sync with the database.
+- `toggle` is `async` — it calls the API and updates state from the server response so the UI is always in sync with the database.
 - `Set<number>` is still used for O(1) `has()` lookups, but the set is now hydrated from the server on each login rather than from `localStorage`.
-- Errors during `toggle` are swallowed silently — the existing `items` state is preserved, preventing an inconsistent UI.
+- On toggle failure, `toggle` re-fetches `GET /wishlist` to restore the correct server state before rethrowing. Callers (e.g. `ProductDetail`, `Wishlist`) catch the rethrown error and show an error toast.
 
 ---
 
@@ -592,21 +598,27 @@ function App() {
 Three route guard components are defined:
 
 ```tsx
+const AuthLoadingFallback = (
+  <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+    <CircularProgress />
+  </Box>
+);
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;   // suspend render until /auth/me resolves
+  if (loading) return AuthLoadingFallback;   // full-screen spinner until /auth/me resolves
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return AuthLoadingFallback;
   return isAuthenticated ? <Navigate to="/" replace /> : <>{children}</>;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return AuthLoadingFallback;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return user?.role === "admin" ? <>{children}</> : <Navigate to="/" replace />;
 }
@@ -678,7 +690,7 @@ function App() {
 | `/manage-orders` | `ManageOrders` | Order status management |
 | `/activity-log` | `ActivityLogPage` | Paginated event log |
 
-All guards read `loading` from `useAuth()` and render nothing (`null`) until the initial `/auth/me` call resolves. This prevents the auth flicker where a user with a stored token is briefly seen as unauthenticated on page load. All redirects use `replace` so the back button doesn't loop.
+All guards read `loading` from `useAuth()` and render a full-screen `CircularProgress` spinner until the initial `/auth/me` call resolves. This prevents the blank flash where a user with a stored token is briefly seen as unauthenticated on page load. All redirects use `replace` so the back button doesn't loop.
 
 ### Public routes
 
@@ -1019,6 +1031,12 @@ This is **separate** from the data-fetch effect (which only runs on mount). Keep
 
 The search `TextField` has an `AutoAwesomeIcon` `IconButton` toggle to the right. When active it lights up with `color="primary"`.
 
+Product image `onError` handlers and `src` fallbacks use the shared `placeholderImage(name)` utility (`src/utils/placeholder.ts`) which returns an inline SVG `data:` URI — no third-party image service dependency.
+
+Add-to-cart errors are now surfaced via a toast: a `catch` block calls `showToast("Failed to add item. Please try again.", "error")` so silent failures no longer occur.
+
+### AI semantic search mode
+
 ```ts
 // New state
 const [aiMode, setAiMode]               = useState(false);
@@ -1156,15 +1174,22 @@ Related products are fetched from `GET /api/products/{id}/related` (same-categor
 
 ### Wishlist integration
 
-The wishlist toggle button calls `toggle(product.id)` from `useWishlist()` and fires a toast to confirm the action:
+The wishlist toggle button calls `toggle(product.id)` from `useWishlist()` and fires a toast to confirm the action. The handler is `async` and awaits the toggle so errors from the server are caught and shown as an error toast:
 
 ```tsx
-onClick={() => {
+onClick={async () => {
+  if (!isAuthenticated) { navigate("/login"); return; }
   const wasWishlisted = isWishlisted(product.id);
-  toggleWishlist(product.id);
-  showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+  try {
+    await toggleWishlist(product.id);
+    showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+  } catch {
+    showToast("Failed to update wishlist. Please try again.", "error");
+  }
 }}
 ```
+
+Product images use `placeholderImage(name)` for both `src` fallback and `onError`.
 
 ### Add to cart (ProductDetail)
 
@@ -1183,19 +1208,17 @@ The wishlist is **server-persisted** — `WishlistProvider` loads product IDs fr
 const { items } = useWishlist();
 
 useEffect(() => {
-  const ids = [...items];
-  if (ids.length === 0) { setProducts([]); return; }
-
-  Promise.all(ids.map((id) => productsApi.getById(id)))
+  if (items.size === 0) { setProducts([]); setLoading(false); return; }
+  productsApi.getByIds([...items])
     .then(setProducts)
     .catch((err) => setError((err as Error).message))
     .finally(() => setLoading(false));
 }, [items]);
 ```
 
-`Promise.all` fires one `GET /products/{id}` per wishlisted product in parallel. The `useEffect` dependency on `items` means the product list re-fetches whenever the wishlist changes (an item is added or removed), so the page stays up to date without a manual refresh. If a product has been deleted from the backend since it was wishlisted, the catch shows an error state rather than rendering partially.
+`productsApi.getByIds` issues a single `POST /products/batch` request with the array of product IDs, replacing the previous per-ID parallel fetch. The `useEffect` dependency on `items` means the product list re-fetches whenever the wishlist changes (an item is added or removed). Pure removals are short-circuited: if all surviving IDs were already loaded, the existing `products` array is filtered locally without a network call.
 
-Each product card has a heart `IconButton` that calls `toggle(product.id)` to remove it from the wishlist and shows a toast (`"Removed from wishlist"`). The page shows an empty state illustration when no items are wishlisted.
+Each product card has a heart `IconButton` that calls `toggle(product.id)` to remove it from the wishlist and shows a toast (`"Removed from wishlist"`). The page shows an empty state illustration when no items are wishlisted. Product images use `placeholderImage(name)` for both `src` fallback and `onError`.
 
 ### Add to cart (Wishlist)
 
@@ -1388,11 +1411,24 @@ export const fmt = (value: number) =>
 
 Uses the browser-native `Intl.NumberFormat` API with Romanian locale and RON currency. This produces correctly formatted values like `1.299,99 RON`. The function is extracted to `src/utils/currency.ts` and imported into every component that displays monetary values (CartDrawer, Shop, ProductDetail, Wishlist).
 
+### Placeholder images
+
+```ts
+// src/utils/placeholder.ts
+export function placeholderImage(text: string): string {
+  const label = text.length > 24 ? text.substring(0, 24) + "…" : text;
+  const svg = `<svg ...><rect .../><text ...>${label}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+```
+
+Returns an inline SVG `data:` URI rendering a grey rectangle with the product name centred. Used as both the initial `src` (when `product.imageUrl` is empty) and the `onError` fallback (when the URL returns a broken image) in Shop, ProductDetail, and Wishlist. Replaces the previous dependency on `placehold.co` — no third-party image service is required in production.
+
 ### Applied promotions display
 
 ```tsx
 {cart.appliedPromotions.map((promotion) => (
-  <Box key={promotion.promotionName} sx={{ display: "flex", justifyContent: "space-between" }}>
+  <Box key={promotion.promotionId} sx={{ display: "flex", justifyContent: "space-between" }}>
     <Typography color="success.main" variant="body2">
       {promotion.promotionName}
     </Typography>
@@ -1403,9 +1439,9 @@ Uses the browser-native `Intl.NumberFormat` API with Romanian locale and RON cur
 ))}
 ```
 
-`cart.appliedPromotions` is an array of `{ promotionName: string, discount: number }` objects returned by the backend after each cart mutation. The frontend simply iterates and displays them. `Math.abs` is used defensively in case the backend returns negative discount values.
+`cart.appliedPromotions` is an array of `{ promotionId: number, promotionName: string, discount: number }` objects returned by the backend after each cart mutation. The frontend simply iterates and displays them. `Math.abs` is used defensively in case the backend returns negative discount values.
 
-The promotion name is used as the `key` — this is acceptable here because promotion names are unique identifiers, and the array is re-fetched from the server on every mutation.
+`promotionId` is used as the React `key` — a stable numeric ID that remains correct when multiple promotions are applied simultaneously.
 
 ### Drawer footer — "Proceed to Checkout"
 
@@ -1494,8 +1530,8 @@ async function handlePlaceOrder() {
     await refreshCart();                      // clear cart context state
     showToast("Order placed successfully!", "success");
     navigate("/orders");
-  } catch {
-    showToast("Failed to place order. Please try again.", "error");
+  } catch (err) {
+    showToast((err as Error).message || "Failed to place order. Please try again.", "error");
   } finally {
     setPlacing(false);
   }
@@ -1527,7 +1563,7 @@ Displays the authenticated user's order history. Calls `ordersApi.getAll()` once
 Each order is an MUI `Accordion`:
 
 - **Summary (always visible):** order date (`PlacedAt` formatted with `toLocaleDateString`), total, and a status `Chip` — `warning` for Pending, `info` for Confirmed, `primary` for Shipped, `success` for Delivered, `error` for Cancelled.
-- **Details (expanded):** a `Table` listing each order item — columns: Product Name, Quantity, Unit Price, Subtotal.
+- **Details (expanded):** a `Table` listing each order item — columns: Product Name, Quantity, Unit Price, Subtotal. Below the items table, if `order.appliedPromotions.length > 0`, an "Applied Discounts" section lists each promotion name and discount amount.
 
 ```tsx
 {orders.map((order) => (
@@ -1768,7 +1804,7 @@ interface CartItemModel {
   id: number; productId: number; productName: string;
   price: number; quantity: number; subtotal: number;
 }
-interface AppliedPromotionModel { promotionName: string; discount: number; }
+interface AppliedPromotionModel { promotionId: number; promotionName: string; discount: number; }
 interface CartModel {
   items: CartItemModel[];
   subtotal: number;
@@ -1789,8 +1825,13 @@ interface AnalysisResponseModel { summary: string; suggestions: SuggestionModel[
 
 **Frontend type** (`components/shared/types/Cart.ts`):
 ```ts
-// Interfaces mirror the model almost exactly for Cart
-// but mappers normalize nullability:
+// The AppliedPromotion frontend type preserves promotionId from the model:
+interface AppliedPromotion { promotionId: number; promotionName: string; discount: number; }
+
+// toAppliedPromotion maps all three fields through:
+export function toAppliedPromotion(dto: AppliedPromotionModel): AppliedPromotion {
+  return { promotionId: dto.promotionId, promotionName: dto.promotionName, discount: dto.discount };
+}
 
 export function toCart(dto: CartModel): Cart {
   return {
@@ -1964,9 +2005,16 @@ interface ShippingAddressInput {
   phone: string;
 }
 
+interface OrderAppliedPromotionModel {
+  promotionId: number;
+  promotionName: string;    // snapshotted at query time from the Promotion entity
+  discount: number;
+}
+
 interface OrderModel {
   id: number;
   items: OrderItemModel[];
+  appliedPromotions: OrderAppliedPromotionModel[];
   total: number;
   status: string;           // "Pending" | "Confirmed" | "Shipped" | "Delivered" | "Cancelled"
   placedAt: string;         // ISO 8601 UTC string
@@ -1982,7 +2030,7 @@ interface AdminOrderModel extends OrderModel {
 }
 ```
 
-`ShippingAddressInput` is used by `ordersApi.place()` to send the shipping address to the backend. `AdminOrderModel` extends `OrderModel` and is used exclusively by `ManageOrders`. No mapper is needed — shapes are flat and all fields are required primitives.
+`ShippingAddressInput` is used by `ordersApi.place()` to send the shipping address to the backend. `AdminOrderModel` extends `OrderModel` and is used exclusively by `ManageOrders`. `appliedPromotions` is populated from the `OrderAppliedPromotion` join table (eager-loaded with ThenInclude). No mapper is needed — shapes are flat and all fields are required primitives.
 
 ---
 
@@ -2075,15 +2123,18 @@ export const cartApi = {
 
 ```ts
 export const productsApi = {
-  getAll:  async (): Promise<Product[]>               => (await http.get<ProductModel[]>("/products")).map(toProduct),
-  getById: async (id: number): Promise<Product>       => toProduct(await http.get<ProductModel>(`/products/${id}`)),
-  create:  async (data: ProductInput): Promise<Product> => toProduct(await http.post<ProductModel>("/products", data)),
-  update:  async (id: number, data: ProductInput)     => toProduct(await http.put<ProductModel>(`/products/${id}`, data)),
-  remove:  (id: number)                               => http.remove<void>(`/products/${id}`),
+  getAll:    async (): Promise<Product[]>               => (await http.get<ProductModel[]>("/products")).map(toProduct),
+  getById:   async (id: number): Promise<Product>       => toProduct(await http.get<ProductModel>(`/products/${id}`)),
+  getByIds:  async (ids: number[]): Promise<Product[]>  => (await http.post<ProductModel[]>("/products/batch", ids)).map(toProduct),
+  search:    async (query: string): Promise<Product[]>  => (await http.get<ProductModel[]>(`/products?name=${encodeURIComponent(query)}`)).map(toProduct),
+  getRelated: async (id: number): Promise<Product[]>    => (await http.get<ProductModel[]>(`/products/${id}/related`)).map(toProduct),
+  create:    async (data: ProductInput): Promise<Product> => toProduct(await http.post<ProductModel>("/products", data)),
+  update:    async (id: number, data: ProductInput)     => toProduct(await http.put<ProductModel>(`/products/${id}`, data)),
+  remove:    (id: number)                               => http.remove<void>(`/products/${id}`),
 };
 ```
 
-`getById` is used by `ProductDetail` and `Wishlist` pages to fetch a single product's full data. `remove` doesn't need a mapper since it returns `void`.
+`getById` is used by `ProductDetail` to fetch a single product's full data. `getByIds` posts to `POST /products/batch` and is used by the `Wishlist` page to fetch all wishlisted products in a single request. `search` hits `GET /products?name=` and is used by `PromotionFormDialog` for debounced product autocomplete. `remove` doesn't need a mapper since it returns `void`.
 
 ### Categories and Promotions API Clients
 
@@ -2333,12 +2384,11 @@ Threshold display is context-aware:
 />
 ```
 
-`productId` and `categoryId` are stored as strings in state and converted in `handleSave`:
-```ts
-productId:  productId  !== "" ? parseInt(productId,  10) : undefined,
-categoryId: categoryId !== "" ? parseInt(categoryId, 10) : undefined,
-```
-These are optional fields — a promotion may be scoped to a specific product or category, or be global (neither set).
+**Reward value validation:** `rewardValue` is parsed with `parseFloat` (not `parseInt`) so decimal values like `15.5` are preserved. When `reward === PromotionReward.PercentDiscount`, values > 100 are rejected with "Percent discount cannot exceed 100%." before the API call — mirrors the backend `ValidatePromotionRules` check.
+
+**Product search autocomplete:** `PromotionFormDialog` uses a debounced MUI `Autocomplete` for the optional product scope field. As the admin types a product name, `productsApi.search(query)` (`GET /products?name=...`) is called after 300 ms of inactivity to populate the dropdown options. When editing an existing promotion with a `productId`, the product is fetched once via `productsApi.getById` on mount to pre-populate the field.
+
+`productId` and `categoryId` are mutually exclusive — selecting a product clears the category and vice versa. Both are optional; leaving both empty creates a cart-wide promotion.
 
 ### 16.4 Banners
 
@@ -2346,7 +2396,9 @@ These are optional fields — a promotion may be scoped to a specific product or
 
 Follows the same CRUD pattern as Categories/Products/Promotions. Table columns: Title, Subtitle, Link URL, Display Order, Status (Active/Inactive chip), Actions.
 
-`BannerFormDialog` fields: Title (required), Subtitle, Image URL, Link URL, Promotion ID (optional), Display Order (numeric), Active checkbox. All optional string fields are trimmed and converted to `undefined` if empty before sending to the API so the backend receives `null` rather than `""`.
+`BannerFormDialog` fields: Title (required), Subtitle, Image URL, Link URL, Promotion (optional autocomplete), Display Order (numeric), Active checkbox. All optional string fields are trimmed and converted to `undefined` if empty before sending to the API so the backend receives `null` rather than `""`.
+
+The Promotion field uses an MUI `Autocomplete` loaded from `promotionsApi.getAll()` on dialog mount. Admins select by name — the ID is set automatically from the selected object. When editing a banner with an existing `promotionId`, the matching promotion is pre-selected from the loaded list.
 
 The `displayOrder` field controls the rendering order in the UserHome banner carousel (sorted ascending by the backend).
 
@@ -2382,15 +2434,19 @@ Fetches on mount and every 60 seconds via `activityLogApi.getLatest(30)`. The cl
 
 **Action formatting:**
 ```ts
+const ACTION_LABELS: Record<string, string> = {
+  CategoryCreated: "created", CategoryUpdated: "updated", CategoryDeleted: "deleted",
+  ProductCreated:  "created", ProductUpdated:  "updated", ProductDeleted:  "deleted",
+  PromotionCreated:"created", PromotionUpdated:"updated", PromotionDeleted:"deleted",
+  BannerCreated:   "created", BannerUpdated:   "updated", BannerDeleted:   "deleted",
+};
+
 function formatAction(log: ActivityLogModel): string {
-  const verb = log.action
-    .replace(log.entityType, "")  // strip entity type from action string
-    .replace(/([A-Z])/g, " $1")   // insert space before each capital
-    .trim().toLowerCase();
+  const verb = ACTION_LABELS[log.action] ?? log.action;
   return `${log.entityType} "${log.entityName}" ${verb}`;
 }
 ```
-This converts `"CategoryUpdated"` + `entityType = "Category"` + `entityName = "Electronics"` → `Category "Electronics" updated`.
+A static lookup map replaces the previous PascalCase-strip regex, which could produce garbled output for action strings that didn't follow the exact `EntityTypeVerb` pattern. Unknown actions fall back to the raw `log.action` string. The same `ACTION_LABELS` map is duplicated in both `ActivityLog` (embedded widget) and `ActivityLogPage` (standalone page).
 
 **Entity icons:** A `Record<string, ReactNode>` maps `"Category"`, `"Product"`, `"Promotion"`, and `"Banner"` to their respective MUI icons. Unknown entity types fall back to `HistoryIcon`.
 

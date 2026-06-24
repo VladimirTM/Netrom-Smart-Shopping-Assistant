@@ -50,7 +50,7 @@ Contains all database concerns: EF Core entity classes, the `DbContext`, reposit
 | `Configurations/` | Fluent API config extracted from DbContext per entity — includes `OrderConfiguration` (indexes on `UserId`, `Status`, `PlacedAt`; precision on `Total`) and `UserConfiguration` (unique index on `Email`; max-length constraints) |
 | `Repositories/` | BaseRepository + specialised repositories |
 | `Seeders/` | Category, Product, Promotion, Banner, and User seeders run on startup |
-| `Migrations/` | EF-generated migration history — includes `AddIndexesAndOrderConfig` (DB indexes + Order/User Fluent configs), `RestrictCartItemProductDelete` (ON DELETE RESTRICT for CartItem → Product FK), `RemoveHasDataSeeds` (removes `HasData` seed calls from migrations in favour of runtime seeders) |
+| `Migrations/` | EF-generated migration history — includes `AddIndexesAndOrderConfig` (DB indexes + Order/User Fluent configs), `RestrictCartItemProductDelete` (ON DELETE RESTRICT for CartItem → Product FK), `RemoveHasDataSeeds` (removes `HasData` seed calls from migrations in favour of runtime seeders), `AddSecurityStampToUser` (adds `SecurityStamp` column to `Users` table) |
 
 ### 2.2 BusinessLogic
 
@@ -111,6 +111,7 @@ public class User
     public string PasswordHash { get; set; }   // BCrypt hash
     public string Role { get; set; }           // "user" | "admin"
     public string? DisplayName { get; set; }
+    public string SecurityStamp { get; set; }  // random GUID; rotate on password/role change to invalidate tokens
     public DateTime CreatedAt { get; set; }
 
     public ICollection<CartItem> CartItems { get; set; }
@@ -283,7 +284,7 @@ public class OrderAppliedPromotion
     public Promotion Promotion { get; set; }
 }
 ```
-Join table that records which promotions were applied at checkout and the discount amount. Written by `OrderService.PlaceOrderAsync` using the applied promotions calculated by `CartItemService.GetAllAsync`. Cascade deletes when the parent order is deleted; `Restrict` delete on the promotion side (a promotion cannot be deleted while order history references it). Used by `AnalyticsService` to count real promotion usage.
+Join table that records which promotions were applied at checkout and the discount amount. Written by `OrderService.PlaceOrderAsync` using the applied promotions calculated by `CartItemService.GetAllAsync`. Cascade deletes when the parent order is deleted; `Restrict` delete on the promotion side (a promotion cannot be deleted while order history references it). Used by `AnalyticsService` to count real promotion usage. All order queries (`GetByUserIdAsync`, `GetAllAsync`, `GetByIdAsync`) eager-load `.Include(o => o.AppliedPromotions).ThenInclude(ap => ap.Promotion)` so `OrderGetDTO.AppliedPromotions` is always populated; if a promotion has since been deleted `PromotionName` falls back to `"Deleted Promotion"`.
 
 ---
 
@@ -312,9 +313,9 @@ Extend `BaseRepository<T>` with domain-specific queries:
 
 | Repository | Extra methods |
 |-----------|---------------|
-| `IProductRepository` / `ProductRepository` | `GetAllWithDetailsAsync(categoryId?)`, `GetWithDetailsAsync(id)`, `GetRelatedAsync(id)`, `GetByIdsAsync(ids)` |
+| `IProductRepository` / `ProductRepository` | `GetByIdWithCategoriesAsync(id)`, `GetAllWithCategoriesAsync()`, `GetByIdsAsync(ids)`, `GetRelatedAsync(id)` |
 | `ICartItemRepository` / `CartItemRepository` | `GetAllByUserIdAsync(userId)`, `GetByProductAndUserAsync(productId, userId)`, `GetByIdForUserAsync(id, userId)` |
-| `IOrderRepository` / `OrderRepository` | `GetByUserIdAsync(userId)`, `GetByIdWithItemsAsync(id)`, `GetAllWithUserAsync()` |
+| `IOrderRepository` / `OrderRepository` | `GetByUserIdAsync(userId)`, `GetByIdAsync(id)`, `GetAllAsync()` — all three include `.Include(o => o.AppliedPromotions).ThenInclude(ap => ap.Promotion)` |
 | `IPromotionRepository` / `PromotionRepository` | `GetAllActiveAsync()`, `GetByProductIdAsync(productId)`, `GetByCategoryIdAsync(categoryId)` |
 | `IUserRepository` / `UserRepository` | `FindByEmailAsync(email)` |
 | `IActivityLogRepository` / `ActivityLogRepository` | `GetLatestAsync(limit, offset)`, `GetTotalCountAsync()` |
@@ -343,11 +344,11 @@ Each service is registered as `Scoped` (one instance per HTTP request).
 | Service Interface | Implementation | Responsibilities |
 |---|---|---|
 | `IAuthService` | `AuthService` | Register (BCrypt hash), Login (BCrypt verify + JWT), GetCurrentUser, UpdateProfile, ChangePassword |
-| `IProductService` | `ProductService` | CRUD + category assignment (bulk-validates category IDs) + related products + stock management + `GetByIdsAsync` |
+| `IProductService` | `ProductService` | CRUD + category assignment (bulk-validates category IDs) + related products + stock management + `GetByIdsAsync` + `GetAllAsync(categoryId?, name?)` (case-insensitive name filter) |
 | `ICategoryService` | `CategoryService` | CRUD categories |
 | `IPromotionService` | `PromotionService` | CRUD promotions + `GetApplicablePromotionsAsync(cartItems)` |
 | `ICartItemService` | `CartItemService` | Add/update/remove cart items with server-side stock validation; `GetAllAsync` builds `CartGetDTO` with best-promotion-wins grouping; `AnalyzeCartAsync` orchestrates AI agents |
-| `IOrderService` | `OrderService` | `PlaceOrderAsync` (clears cart, creates order + items + applied promotions snapshot, decrements stock); `GetOrdersAsync`; `GetAllOrdersAsync`; `UpdateOrderStatusAsync` |
+| `IOrderService` | `OrderService` | `PlaceOrderAsync` (clears cart, creates order + items + applied promotions snapshot, decrements stock); `GetOrdersAsync`; `GetAllOrdersAsync`; `UpdateOrderStatusAsync` (restores stock atomically on `"Cancelled"` transition) |
 | `IBannerService` | `BannerService` | CRUD banners; uses `IBannerRepository` for type-safe `GetAllActiveAsync()` |
 | `IAnalyticsService` | `AnalyticsService` | Aggregated summary: total revenue and order count (excluding `Pending` and `Cancelled`), top products by units sold (same filter), promotion usage count from `OrderAppliedPromotions` |
 | `IActivityLogService` | `ActivityLogService` | `LogAsync(...)`, `GetLatestAsync(limit, offset)`, `GetTotalCountAsync()` |
@@ -419,9 +420,10 @@ Rate limiting: 10 requests / 60s per IP on `/register` and `/login` via the `"au
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/products` | Public | List all products; optional `?categoryId=` filter |
+| GET | `/products` | Public | List all products; optional `?categoryId=` and `?name=` filters (case-insensitive substring match on name) |
 | GET | `/products/{id}` | Public | Get single product with categories, promotions, stock |
 | GET | `/products/{id}/related` | Public | Get related products (same category) |
+| POST | `/products/batch` | Public | Get multiple products by IDs; body: `int[]`; returns `ProductGetDTO[]` |
 | POST | `/products` | Admin | Create product; logs `ProductCreated` |
 | PUT | `/products/{id}` | Admin | Update product; logs `ProductUpdated` |
 | DELETE | `/products/{id}` | Admin | Delete product; logs `ProductDeleted` |
@@ -442,8 +444,8 @@ Rate limiting: 10 requests / 60s per IP on `/register` and `/login` via the `"au
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/promotions` | Public | List all promotions |
-| POST | `/promotions` | Admin | Create promotion; logs `PromotionCreated` |
-| PUT | `/promotions/{id}` | Admin | Update promotion; logs `PromotionUpdated` |
+| POST | `/promotions` | Admin | Create promotion; logs `PromotionCreated`; returns `400` if `ValidatePromotionRules` fails (e.g. `PercentDiscount > 100`) |
+| PUT | `/promotions/{id}` | Admin | Update promotion; logs `PromotionUpdated`; returns `404` if not found, `400` if validation fails |
 | DELETE | `/promotions/{id}` | Admin | Delete promotion; logs `PromotionDeleted` |
 
 ### Banners — `BannerController`
@@ -478,17 +480,17 @@ All cart mutations return the updated `CartGetDTO` so the frontend stays in sync
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/orders` | Place order from current cart; body: `PlaceOrderRequest` (shipping details) |
-| GET | `/orders` | Get caller's order history |
+| GET | `/orders` | Get caller's order history; each `OrderGetDTO` includes `AppliedPromotions` |
 
 ### Admin Orders — `AdminOrderController`
 `[Route("api/admin/orders")]` — requires `[Authorize(Roles = "admin")]`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/orders` | Get all orders across all users |
+| GET | `/admin/orders` | Get all orders across all users; each `AdminOrderGetDTO` includes `AppliedPromotions` |
 | PUT | `/admin/orders/{id}/status` | Update order status; body: `{ status }` |
 
-Valid statuses: `Pending`, `Confirmed`, `Shipped`, `Delivered`, `Cancelled`.
+Valid statuses: `Pending`, `Confirmed`, `Shipped`, `Delivered`, `Cancelled`. Transitioning to `Cancelled` restores each order item's `StockQuantity` in the same database transaction.
 
 ### Analytics — `AnalyticsController`
 `[Route("api/analytics")]` — requires Admin
@@ -546,6 +548,7 @@ Generated by `AuthService.GenerateToken(user)` using `HmacSha256`. Token carries
 | `ClaimTypes.NameIdentifier` | `user.Id` (int, as string) |
 | `ClaimTypes.Email` | `user.Email` |
 | `ClaimTypes.Role` | `user.Role` ("user" \| "admin") |
+| `"security_stamp"` | `user.SecurityStamp` (GUID string) |
 
 Expiry is configurable via `Jwt:ExpiresInDays` (default 7 days).
 
@@ -571,6 +574,21 @@ TokenValidationParameters
 | `[Authorize]` | Cart, Order controllers | Any authenticated user |
 | `[Authorize(Roles = "admin")]` | Admin endpoints | Only users with Role = "admin" |
 | No attribute | Products GET, Categories GET, etc. | Fully public |
+
+### SecurityStamp Token Invalidation
+
+The `security_stamp` claim embedded in the JWT is validated on every authenticated request via a `JwtBearerEvents.OnTokenValidated` handler in `Program.cs`:
+
+```csharp
+OnTokenValidated = async context =>
+{
+    var user = await userRepo.GetByIdAsync(userId);
+    if (user.SecurityStamp != tokenStamp)
+        context.Fail("Token has been invalidated.");
+}
+```
+
+`ChangePasswordAsync` rotates `user.SecurityStamp = Guid.NewGuid().ToString()` before saving. This means all JWTs issued before the password change carry the old stamp and are immediately rejected on the next request — no token blocklist or logout-all endpoint required.
 
 ### Password Hashing
 
@@ -655,6 +673,8 @@ Migrations + Seeding (startup, not middleware)
     ↓
 MapOpenApi (dev only — serves /openapi/v1.json)
 SwaggerUI (dev only — serves /swagger)
+    ↓
+UseExceptionHandler (global — logs via ILogger<Program>, returns { "error": "..." } JSON 500)
     ↓
 UseCors("FrontendPolicy")
     ↓

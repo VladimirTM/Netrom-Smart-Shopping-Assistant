@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
+  Autocomplete,
   Button,
   Checkbox,
   CircularProgress,
@@ -14,6 +15,8 @@ import {
 } from "@mui/material";
 import type { Banner } from "../../shared/types/Banner";
 import { bannersApi } from "../../../api/clients/BannerApiClient";
+import { promotionsApi } from "../../../api/clients/PromotionApiClient";
+import type { Promotion } from "../../shared/types/Promotion";
 
 interface BannerFormDialogProps {
   banner: Banner | null;
@@ -28,15 +31,30 @@ function BannerFormDialog({ banner, onClose, onSaved }: BannerFormDialogProps) {
   const [subtitle, setSubtitle] = useState(banner?.subtitle ?? "");
   const [imageUrl, setImageUrl] = useState(banner?.imageUrl ?? "");
   const [linkTo, setLinkTo] = useState(banner?.linkTo ?? "");
-  const [promotionId, setPromotionId] = useState(
-    banner?.promotionId?.toString() ?? ""
-  );
+  const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
   const [displayOrder, setDisplayOrder] = useState(
     banner?.displayOrder.toString() ?? "0"
   );
   const [isActive, setIsActive] = useState(banner?.isActive ?? true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [loadingPromotions, setLoadingPromotions] = useState(true);
+
+  useEffect(() => {
+    promotionsApi
+      .getAll()
+      .then((data) => {
+        setPromotions(data);
+        if (banner?.promotionId != null) {
+          setSelectedPromotion(data.find((p) => p.id === banner.promotionId) ?? null);
+        }
+      })
+      .catch(() => setError("Failed to load promotions."))
+      .finally(() => setLoadingPromotions(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function isValidUrl(value: string): boolean {
     if (value.startsWith("/")) return true;
@@ -69,7 +87,7 @@ function BannerFormDialog({ banner, onClose, onSaved }: BannerFormDialogProps) {
         subtitle: subtitle.trim() || undefined,
         imageUrl: imageUrl.trim() || undefined,
         linkTo: linkTo.trim() || undefined,
-        promotionId: promotionId !== "" ? parseInt(promotionId, 10) : undefined,
+        promotionId: selectedPromotion?.id,
         displayOrder: parsedOrder,
         isActive,
       };
@@ -117,13 +135,31 @@ function BannerFormDialog({ banner, onClose, onSaved }: BannerFormDialogProps) {
             onChange={(e) => setLinkTo(e.target.value)}
             fullWidth
           />
-          <TextField
-            label="Promotion ID (optional)"
-            value={promotionId}
-            onChange={(e) => setPromotionId(e.target.value)}
-            fullWidth
-            type="number"
-            slotProps={{ htmlInput: { min: 1 } }}
+          <Autocomplete
+            options={promotions}
+            getOptionLabel={(p) => `${p.name} (ID: ${p.id})`}
+            value={selectedPromotion}
+            onChange={(_, value) => setSelectedPromotion(value)}
+            loading={loadingPromotions}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Promotion (optional)"
+                helperText="Link this banner to an existing promotion"
+                slotProps={{
+                  ...params.slotProps,
+                  input: {
+                    ...params.slotProps?.input,
+                    endAdornment: (
+                      <>
+                        {loadingPromotions ? <CircularProgress size={16} /> : null}
+                        {params.slotProps?.input?.endAdornment}
+                      </>
+                    ),
+                  },
+                }}
+              />
+            )}
           />
           <TextField
             label="Display Order"

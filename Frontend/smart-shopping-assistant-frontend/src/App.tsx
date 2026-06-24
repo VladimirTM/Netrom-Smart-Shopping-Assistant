@@ -1,4 +1,4 @@
-import { Box } from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
 import "./App.css";
 import NavBar from "./components/NavBar";
 import { Navigate, Route, Routes } from "react-router-dom";
@@ -26,21 +26,27 @@ import Profile from "./components/Profile";
 import ManageOrders from "./components/ManageOrders";
 import ActivityLogPage from "./components/ActivityLogPage";
 
+const AuthLoadingFallback = (
+  <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+    <CircularProgress />
+  </Box>
+);
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return AuthLoadingFallback;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return AuthLoadingFallback;
   return isAuthenticated ? <Navigate to="/" replace /> : <>{children}</>;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return AuthLoadingFallback;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return user?.role === "admin" ? <>{children}</> : <Navigate to="/" replace />;
 }

@@ -24,6 +24,7 @@ import { useWishlist } from "../../context/WishlistContext/wishlist-context";
 import { useToast } from "../../context/ToastContext/toast-context";
 import { useAuth } from "../../context/AuthContext/auth-context";
 import { fmt } from "../../utils/currency";
+import { placeholderImage } from "../../utils/placeholder";
 
 function Wishlist() {
   const navigate = useNavigate();
@@ -112,13 +113,13 @@ function Wishlist() {
                 <CardMedia
                   component="img"
                   height="150"
-                  image={product.imageUrl || `https://placehold.co/400x150/eeeeee/999999?text=${encodeURIComponent(product.name)}`}
+                  image={product.imageUrl || placeholderImage(product.name)}
                   alt={product.name}
                   sx={{ objectFit: "cover", cursor: "pointer" }}
                   onClick={() => navigate(`/shop/${product.id}`)}
                   onError={(e) => {
                     const img = e.currentTarget as HTMLImageElement;
-                    img.src = `https://placehold.co/400x150/eeeeee/999999?text=${encodeURIComponent(product.name)}`;
+                    img.src = placeholderImage(product.name);
                   }}
                 />
                 <IconButton

@@ -22,13 +22,13 @@ Built as part of the **Liga AC** program at Netrom.
 
 ### Admin
 - Full CRUD for Products, Categories, Promotions, and Banners
-- Manage orders across all users and update order status
+- Manage orders across all users and update order status (cancellation restores product stock)
 - Analytics dashboard: revenue, order counts, top products, promotion usage
 - Real-time activity log feed (embedded widget in admin home + dedicated paginated page at `/activity-log`)
 
 ### Security
 - JWT authentication (HS256, 7-day expiry); key length enforced ≥ 32 chars on startup
-- BCrypt password hashing
+- BCrypt password hashing; password change rotates `SecurityStamp` to invalidate all existing tokens
 - Role-based authorization (`user` / `admin`)
 - Rate limiting on auth endpoints (10 req/min per IP)
 - Security headers on every response (X-Content-Type-Options, X-Frame-Options, Referrer-Policy; HSTS + CSP in production)
@@ -172,7 +172,7 @@ The dev server starts at `http://localhost:5173` and points to the backend at `h
 | Resource | Public endpoints | Protected (user) | Admin only |
 |----------|-----------------|------------------|------------|
 | Auth | POST `/api/auth/register`, POST `/api/auth/login` | GET/PUT `/api/auth/me`, PUT `/api/auth/me/password` | — |
-| Products | GET `/api/products`, GET `/api/products/{id}`, GET `/api/products/{id}/related` | — | POST/PUT/DELETE `/api/products` |
+| Products | GET `/api/products` (`?categoryId=` / `?name=`), GET `/api/products/{id}`, GET `/api/products/{id}/related`, POST `/api/products/batch` | — | POST/PUT/DELETE `/api/products` |
 | Categories | GET `/api/categories` | — | POST/PUT/DELETE `/api/categories` |
 | Promotions | GET `/api/promotions` | — | POST/PUT/DELETE `/api/promotions` |
 | Banners | GET `/api/banners` | — | POST/PUT/DELETE `/api/banners` |

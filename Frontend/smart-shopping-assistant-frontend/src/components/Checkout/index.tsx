@@ -233,7 +233,7 @@ function ConfirmStep({ shipping }: ConfirmStepProps) {
 
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
         {cart.appliedPromotions.map((p) => (
-          <Typography key={p.promotionName} color="success.main" variant="body2">
+          <Typography key={p.promotionId} color="success.main" variant="body2">
             {p.promotionName}: -{fmt(p.discount)}
           </Typography>
         ))}
@@ -304,8 +304,8 @@ function Checkout() {
       await refreshCart();
       showToast("Order placed successfully!", "success");
       navigate("/orders");
-    } catch {
-      showToast("Failed to place order. Please try again.", "error");
+    } catch (err) {
+      showToast((err as Error).message || "Failed to place order. Please try again.", "error");
     } finally {
       setPlacing(false);
     }

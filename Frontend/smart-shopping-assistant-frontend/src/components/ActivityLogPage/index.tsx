@@ -43,12 +43,23 @@ function formatRelativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  CategoryCreated: "created",
+  CategoryUpdated: "updated",
+  CategoryDeleted: "deleted",
+  ProductCreated: "created",
+  ProductUpdated: "updated",
+  ProductDeleted: "deleted",
+  PromotionCreated: "created",
+  PromotionUpdated: "updated",
+  PromotionDeleted: "deleted",
+  BannerCreated: "created",
+  BannerUpdated: "updated",
+  BannerDeleted: "deleted",
+};
+
 function formatAction(log: ActivityLogModel): string {
-  const verb = log.action
-    .replace(log.entityType, "")
-    .replace(/([A-Z])/g, " $1")
-    .trim()
-    .toLowerCase();
+  const verb = ACTION_LABELS[log.action] ?? log.action;
   return `${log.entityType} "${log.entityName}" ${verb}`;
 }
 

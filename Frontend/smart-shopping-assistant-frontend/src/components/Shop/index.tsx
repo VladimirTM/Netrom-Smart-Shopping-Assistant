@@ -43,6 +43,7 @@ import { useCart } from "../../context/CartContent/cart-context";
 import { useWishlist } from "../../context/WishlistContext/wishlist-context";
 import { useAuth } from "../../context/AuthContext/auth-context";
 import { fmt } from "../../utils/currency";
+import { placeholderImage } from "../../utils/placeholder";
 
 type SortOption = "price-asc" | "price-desc" | "name-asc" | "name-desc";
 
@@ -508,7 +509,7 @@ function Shop() {
                     onClick={() => navigate(`/shop/${product.id}`)}
                     onError={(e) => {
                       const img = e.currentTarget as HTMLImageElement;
-                      img.src = `https://placehold.co/400x150/eeeeee/999999?text=${encodeURIComponent(product.name)}`;
+                      img.src = placeholderImage(product.name);
                     }}
                   />
                   {promotedProductIds.has(product.id) && (
@@ -625,6 +626,8 @@ function Shop() {
                             try {
                               await addItem(product.id, 1);
                               showToast(`${product.name} added to cart`);
+                            } catch {
+                              showToast("Failed to add item. Please try again.", "error");
                             } finally {
                               setAddingId(null);
                             }

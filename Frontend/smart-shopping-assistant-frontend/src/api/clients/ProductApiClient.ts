@@ -10,6 +10,14 @@ export const productsApi = {
   getById: async (id: number): Promise<Product> => {
     return toProduct(await http.get<ProductModel>(`/products/${id}`));
   },
+  getByIds: async (ids: number[]): Promise<Product[]> => {
+    const data = await http.post<ProductModel[]>("/products/batch", ids);
+    return data.map(toProduct);
+  },
+  search: async (query: string): Promise<Product[]> => {
+    const data = await http.get<ProductModel[]>(`/products?name=${encodeURIComponent(query)}`);
+    return data.map(toProduct);
+  },
   getRelated: async (id: number): Promise<Product[]> => {
     const data = await http.get<ProductModel[]>(`/products/${id}/related`);
     return data.map(toProduct);

@@ -120,9 +120,13 @@ function PromotionFormDialog({
       setError("Threshold must be a valid positive number.");
       return;
     }
-    const parsedRewardValue = parseInt(rewardValue, 10);
+    const parsedRewardValue = parseFloat(rewardValue);
     if (isNaN(parsedRewardValue) || parsedRewardValue <= 0) {
-      setError("Reward value must be a valid positive integer.");
+      setError("Reward value must be a valid positive number.");
+      return;
+    }
+    if (reward === PromotionReward.PercentDiscount && parsedRewardValue > 100) {
+      setError("Percent discount cannot exceed 100%.");
       return;
     }
     setSaving(true);

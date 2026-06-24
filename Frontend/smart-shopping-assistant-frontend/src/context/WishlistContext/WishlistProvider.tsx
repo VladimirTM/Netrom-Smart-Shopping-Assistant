@@ -21,10 +21,21 @@ function WishlistProvider({ children }: { children: ReactNode }) {
   const toggle = useCallback(
     async (productId: number) => {
       const inWishlist = items.has(productId);
-      const data = inWishlist
-        ? await wishlistApi.removeItem(productId)
-        : await wishlistApi.addItem(productId);
-      setItems(new Set(data.productIds));
+      try {
+        const data = inWishlist
+          ? await wishlistApi.removeItem(productId)
+          : await wishlistApi.addItem(productId);
+        setItems(new Set(data.productIds));
+      } catch (err) {
+        // Re-sync with server state so the local Set doesn't diverge
+        try {
+          const fresh = await wishlistApi.getWishlist();
+          setItems(new Set(fresh.productIds));
+        } catch {
+          // If re-sync also fails, leave state as-is; next page load will re-fetch
+        }
+        throw err;
+      }
     },
     [items]
   );

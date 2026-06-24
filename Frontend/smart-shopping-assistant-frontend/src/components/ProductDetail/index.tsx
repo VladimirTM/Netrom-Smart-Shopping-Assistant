@@ -29,6 +29,7 @@ import { useWishlist } from "../../context/WishlistContext/wishlist-context";
 import { useToast } from "../../context/ToastContext/toast-context";
 import { useAuth } from "../../context/AuthContext/auth-context";
 import { fmt } from "../../utils/currency";
+import { placeholderImage } from "../../utils/placeholder";
 
 function ProductDetail() {
   const { productId } = useParams<{ productId: string }>();
@@ -122,11 +123,11 @@ function ProductDetail() {
         <Box sx={{ flexShrink: 0, width: { xs: "100%", md: 400 } }}>
           <Box
             component="img"
-            src={product.imageUrl || `https://placehold.co/400x400/eeeeee/999999?text=${encodeURIComponent(product.name)}`}
+            src={product.imageUrl || placeholderImage(product.name)}
             alt={product.name}
             onError={(e) => {
               const img = e.currentTarget as HTMLImageElement;
-              img.src = `https://placehold.co/400x400/eeeeee/999999?text=${encodeURIComponent(product.name)}`;
+              img.src = placeholderImage(product.name);
             }}
             sx={{ width: "100%", borderRadius: 2, objectFit: "cover", maxHeight: 400 }}
           />
@@ -140,11 +141,15 @@ function ProductDetail() {
             </Typography>
             {!isAdmin && (
               <IconButton
-                onClick={() => {
+                onClick={async () => {
                   if (!isAuthenticated) { navigate("/login"); return; }
                   const wasWishlisted = isWishlisted(product.id);
-                  void toggleWishlist(product.id);
-                  showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+                  try {
+                    await toggleWishlist(product.id);
+                    showToast(wasWishlisted ? "Removed from wishlist" : "Saved to wishlist", wasWishlisted ? "info" : "success");
+                  } catch {
+                    showToast("Failed to update wishlist. Please try again.", "error");
+                  }
                 }}
                 sx={{ flexShrink: 0 }}
               >
@@ -308,12 +313,12 @@ function ProductDetail() {
                 <CardMedia
                   component="img"
                   height="130"
-                  image={rel.imageUrl || `https://placehold.co/400x130/eeeeee/999999?text=${encodeURIComponent(rel.name)}`}
+                  image={rel.imageUrl || placeholderImage(rel.name)}
                   alt={rel.name}
                   sx={{ objectFit: "cover" }}
                   onError={(e) => {
                     const img = e.currentTarget as HTMLImageElement;
-                    img.src = `https://placehold.co/400x130/eeeeee/999999?text=${encodeURIComponent(rel.name)}`;
+                    img.src = placeholderImage(rel.name);
                   }}
                 />
                 <CardContent sx={{ pb: 1 }}>

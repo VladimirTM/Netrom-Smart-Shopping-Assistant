@@ -15,6 +15,7 @@ export interface CartItem {
 }
 
 export interface AppliedPromotion {
+  promotionId: number;
   promotionName: string;
   discount: number;
 }
@@ -42,7 +43,7 @@ export function toCartItem(dto: CartItemModel): CartItem {
 export function toAppliedPromotion(
   dto: AppliedPromotionModel,
 ): AppliedPromotion {
-  return { promotionName: dto.promotionName, discount: dto.discount };
+  return { promotionId: dto.promotionId, promotionName: dto.promotionName, discount: dto.discount };
 }
 
 export function toCart(dto: CartModel): Cart {

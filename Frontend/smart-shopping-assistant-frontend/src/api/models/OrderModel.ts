@@ -6,6 +6,12 @@ export interface OrderItemModel {
   subtotal: number;
 }
 
+export interface OrderAppliedPromotionModel {
+  promotionId: number;
+  promotionName: string;
+  discount: number;
+}
+
 export interface ShippingAddressInput {
   name: string;
   address: string;
@@ -17,6 +23,7 @@ export interface ShippingAddressInput {
 export interface OrderModel {
   id: number;
   items: OrderItemModel[];
+  appliedPromotions: OrderAppliedPromotionModel[];
   total: number;
   status: string;
   placedAt: string;
